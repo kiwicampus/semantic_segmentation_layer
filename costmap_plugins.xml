@@ -1,0 +1,10 @@
+<library path="semantic_segmentation_layer">
+  <class type="semantic_segmentation_layer::SemanticSegmentationLayer" base_class_type="nav2_costmap_2d::Layer">
+    <description>
+      A costmap layer plugin that integrates semantic segmentation data into the navigation costmap.
+      This plugin subscribes to semantic segmentation images and aligned pointclouds to populate the 2D costmap.
+    </description>
+  </class>
+</library>
+
+
