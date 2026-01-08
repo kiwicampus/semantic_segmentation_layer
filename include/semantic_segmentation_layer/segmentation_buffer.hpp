@@ -1,39 +1,3 @@
-/*********************************************************************
- *
- * Software License Agreement (BSD License)
- *
- *  Copyright (c) 2008, 2013, Willow Garage, Inc.
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *   * Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above
- *     copyright notice, this list of conditions and the following
- *     disclaimer in the documentation and/or other materials provided
- *     with the distribution.
- *   * Neither the name of Willow Garage, Inc. nor the names of its
- *     contributors may be used to endorse or promote products derived
- *     from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- *  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- *  POSSIBILITY OF SUCH DAMAGE.
- *
- * Author: Eitan Marder-Eppstein
- *********************************************************************/
 #ifndef SEMANTIC_SEGMENTATION_LAYER__SEGMENTATION_BUFFER_HPP_
 #define SEMANTIC_SEGMENTATION_LAYER__SEGMENTATION_BUFFER_HPP_
 
@@ -46,7 +10,7 @@
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
-#include "tf2_ros/buffer.h"
+#include "tf2_ros/buffer.hpp"
 #include "tf2_sensor_msgs/tf2_sensor_msgs.hpp"
 #include "vision_msgs/msg/label_info.hpp"
 
@@ -475,7 +439,7 @@ struct PointData {
  * over that tile
  * @param tileMap The segmentation tile map
  */
-sensor_msgs::msg::PointCloud2 visualizeTemporalTileMap(SegmentationTileMap& tileMap) {
+inline sensor_msgs::msg::PointCloud2 visualizeTemporalTileMap(SegmentationTileMap& tileMap) {
     sensor_msgs::msg::PointCloud2 cloud;
     cloud.header.frame_id = "map";  // Set appropriate frame_id
     cloud.header.stamp = rclcpp::Clock().now();  // Set current time as timestamp
@@ -670,7 +634,9 @@ class SegmentationBuffer
      */
     SegmentationBuffer(const nav2_util::LifecycleNode::WeakPtr& parent, std::string buffer_source,
                        std::vector<std::string> class_types,
-                       std::unordered_map<std::string, CostHeuristicParams> class_names_cost_map, double observation_keep_time,
+                       std::unordered_map<std::string, CostHeuristicParams> class_names_cost_map,
+                       std::unordered_map<std::string, std::vector<std::string>> class_type_to_names,
+                       double observation_keep_time,
                        double expected_update_rate, double max_lookahead_distance, double min_lookahead_distance,
                        tf2_ros::Buffer& tf2_buffer, std::string global_frame, std::string sensor_frame,
                        tf2::Duration tf_tolerance, double costmap_resolution, double tile_map_decay_time, bool visualize_tile_map = false,
@@ -732,6 +698,13 @@ class SegmentationBuffer
      */
     std::string getBufferSource() { return buffer_source_; }
     std::vector<std::string> getClassTypes() { return class_types_; }
+    
+    /**
+     * @brief Get class names for a specific class type
+     * @param class_type The class type to get names for
+     * @return Vector of class names for the given type
+     */
+    std::vector<std::string> getClassNamesForType(const std::string& class_type);
 
     void setMinObstacleDistance(double distance) { sq_min_lookahead_distance_ = pow(distance, 2); }
 
@@ -765,6 +738,7 @@ class SegmentationBuffer
     tf2_ros::Buffer& tf2_buffer_;
     std::vector<std::string> class_types_;
     std::unordered_map<std::string, CostHeuristicParams> class_names_cost_map_;
+    std::unordered_map<std::string, std::vector<std::string>> class_type_to_names_;
     const rclcpp::Duration observation_keep_time_;
     const rclcpp::Duration expected_update_rate_;
     rclcpp::Time last_updated_;

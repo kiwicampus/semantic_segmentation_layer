@@ -1,41 +1,3 @@
-/*********************************************************************
- *
- * Software License Agreement (BSD License)
- *
- *  Copyright (c) 2008, 2013, Willow Garage, Inc.
- *  Copyright (c) 2020, Samsung R&D Institute Russia
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *   * Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above
- *     copyright notice, this list of conditions and the following
- *     disclaimer in the documentation and/or other materials provided
- *     with the distribution.
- *   * Neither the name of Willow Garage, Inc. nor the names of its
- *     contributors may be used to endorse or promote products derived
- *     from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- *  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- *  POSSIBILITY OF SUCH DAMAGE.
- *
- * Author: Pedro Gonzalez
-
- *********************************************************************/
 #ifndef SEMANTIC_SEGMENTATION_LAYER_HPP_
 #define SEMANTIC_SEGMENTATION_LAYER_HPP_
 
@@ -44,16 +6,15 @@
 
 #include "rclcpp/rclcpp.hpp"
 
-#include "message_filters/subscriber.h"
-#include "message_filters/time_synchronizer.h"
+#include "message_filters/subscriber.hpp"
+#include "message_filters/time_synchronizer.hpp"
 #include "nav2_costmap_2d/costmap_layer.hpp"
 #include "nav2_costmap_2d/layer.hpp"
 #include "nav2_costmap_2d/layered_costmap.hpp"
 #include "semantic_segmentation_layer/segmentation_buffer.hpp"
 #include "nav2_util/node_utils.hpp"
-#include "rclcpp/rclcpp.hpp"
 #include "sensor_msgs/msg/image.hpp"
-#include "tf2_ros/message_filter.h"
+#include "tf2_ros/message_filter.hpp"
 #include "vision_msgs/msg/label_info.hpp"
 
 namespace semantic_segmentation_layer {
@@ -61,7 +22,7 @@ namespace semantic_segmentation_layer {
  * @class SemanticSegmentationLayer
  * @brief Takes in semantic segmentation messages and aligned pointclouds to populate the 2D costmap
  */
-class SemanticSegmentationLayer : public CostmapLayer
+class SemanticSegmentationLayer : public nav2_costmap_2d::CostmapLayer
 {
    public:
     /**
@@ -138,15 +99,13 @@ class SemanticSegmentationLayer : public CostmapLayer
     void labelinfoCb(const std::shared_ptr<const vision_msgs::msg::LabelInfo>& label_info,
                      const std::shared_ptr<semantic_segmentation_layer::SegmentationBuffer>& buffer);
 
-    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image, rclcpp_lifecycle::LifecycleNode>>>
+    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image>>>
         semantic_segmentation_subs_;
-    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image, rclcpp_lifecycle::LifecycleNode>>>
+    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image>>>
         semantic_segmentation_confidence_subs_;
-    std::vector<
-        std::shared_ptr<message_filters::Subscriber<vision_msgs::msg::LabelInfo, rclcpp_lifecycle::LifecycleNode>>>
+    std::vector<std::shared_ptr<message_filters::Subscriber<vision_msgs::msg::LabelInfo>>>
         label_info_subs_;
-    std::vector<
-        std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::PointCloud2, rclcpp_lifecycle::LifecycleNode>>>
+    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::PointCloud2>>>
         pointcloud_subs_;
     std::vector<
         std::shared_ptr<message_filters::TimeSynchronizer<sensor_msgs::msg::Image, sensor_msgs::msg::PointCloud2>>>

@@ -43,13 +43,15 @@
 #include <vector>
 
 #include "sensor_msgs/point_cloud2_iterator.hpp"
-#include "tf2/convert.h"
+#include "tf2/convert.hpp"
 #include "rclcpp/rclcpp.hpp"
 using namespace std::chrono_literals;
 
 namespace semantic_segmentation_layer {
 SegmentationBuffer::SegmentationBuffer(const nav2_util::LifecycleNode::WeakPtr& parent,
-                                       std::string buffer_source, std::vector<std::string> class_types, std::unordered_map<std::string, CostHeuristicParams> class_names_cost_map, double observation_keep_time,
+                                       std::string buffer_source, std::vector<std::string> class_types, std::unordered_map<std::string, CostHeuristicParams> class_names_cost_map,
+                                       std::unordered_map<std::string, std::vector<std::string>> class_type_to_names,
+                                       double observation_keep_time,
                                        double expected_update_rate, double max_lookahead_distance,
                                        double min_lookahead_distance, tf2_ros::Buffer& tf2_buffer,
                                        std::string global_frame, std::string sensor_frame,
@@ -58,6 +60,7 @@ SegmentationBuffer::SegmentationBuffer(const nav2_util::LifecycleNode::WeakPtr& 
   : tf2_buffer_(tf2_buffer)
   , class_types_(class_types)
   , class_names_cost_map_(class_names_cost_map)
+  , class_type_to_names_(class_type_to_names)
   , observation_keep_time_(rclcpp::Duration::from_seconds(observation_keep_time))
   , expected_update_rate_(rclcpp::Duration::from_seconds(expected_update_rate))
   , global_frame_(global_frame)
@@ -238,6 +241,16 @@ void SegmentationBuffer::bufferSegmentation(
 std::unordered_map<std::string, CostHeuristicParams> SegmentationBuffer::getClassMap()
 {
   return class_names_cost_map_;
+}
+
+std::vector<std::string> SegmentationBuffer::getClassNamesForType(const std::string& class_type)
+{
+  auto it = class_type_to_names_.find(class_type);
+  if (it != class_type_to_names_.end())
+  {
+    return it->second;
+  }
+  return std::vector<std::string>();
 }
 
 

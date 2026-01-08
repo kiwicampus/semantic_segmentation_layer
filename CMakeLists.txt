@@ -11,7 +11,7 @@ find_package(ament_cmake REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(message_filters REQUIRED)
 find_package(nav2_costmap_2d REQUIRED)
-find_package(nav2_ros_common REQUIRED)
+find_package(nav2_util REQUIRED)
 find_package(nav2_util REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
@@ -44,7 +44,7 @@ target_link_libraries(semantic_segmentation_layer
   PUBLIC
     message_filters::message_filters
     nav2_costmap_2d::nav2_costmap_2d_core
-    nav2_ros_common::nav2_ros_common
+    nav2_util::nav2_util_core
     nav2_util::nav2_util_core
     pluginlib::pluginlib
     rclcpp::rclcpp
@@ -52,7 +52,7 @@ target_link_libraries(semantic_segmentation_layer
     tf2::tf2
     tf2_ros::tf2_ros
     tf2_sensor_msgs::tf2_sensor_msgs
-    vision_msgs::vision_msgs
+    ${vision_msgs_TARGETS}
 )
 
 # Install library

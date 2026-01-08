@@ -1,45 +1,3 @@
-/*********************************************************************
- *
- * Software License Agreement (BSD License)
- *
- *  Copyright (c) 2008, 2013, Willow Garage, Inc.
- *  Copyright (c) 2020, Samsung R&D Institute Russia
- *  All rights reserved.
- *
- *  Redistribution and use in source and binary forms, with or without
- *  modification, are permitted provided that the following conditions
- *  are met:
- *
- *   * Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer.
- *   * Redistributions in binary form must reproduce the above
- *     copyright notice, this list of conditions and the following
- *     disclaimer in the documentation and/or other materials provided
- *     with the distribution.
- *   * Neither the name of Willow Garage, Inc. nor the names of its
- *     contributors may be used to endorse or promote products derived
- *     from this software without specific prior written permission.
- *
- *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- *  FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- *  COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- *  INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- *  BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- *  LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- *  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- *  LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- *  POSSIBILITY OF SUCH DAMAGE.
- *
- * Author: Eitan Marder-Eppstein
- *         David V. Lu!!
- *         Alexey Merzlyakov
- *
- * Reference tutorial:
- * https://navigation.ros.org/tutorials/docs/writing_new_costmap2d_plugin.html
- *********************************************************************/
 #include "semantic_segmentation_layer/semantic_segmentation_layer.hpp"
 
 #include "nav2_costmap_2d/costmap_math.hpp"
@@ -88,7 +46,7 @@ void SemanticSegmentationLayer::onInitialize()
   if (track_unknown_space) {
     default_value_ = NO_INFORMATION;
   } else {
-    default_value_ = FREE_SPACE;
+    default_value_ = nav2_costmap_2d::FREE_SPACE;
   }
 
   matchSize();
@@ -137,6 +95,8 @@ void SemanticSegmentationLayer::onInitialize()
     
     std::unordered_map<std::string, CostHeuristicParams> class_map;
 
+    // Build class_type to class_names mapping for the buffer
+    std::unordered_map<std::string, std::vector<std::string>> class_type_to_names;
     for (auto& class_type : class_types_string)
     {
       std::vector<std::string> classes_ids;
@@ -145,7 +105,7 @@ void SemanticSegmentationLayer::onInitialize()
       declareParameter(source + "." + class_type + ".max_cost", rclcpp::ParameterValue(0));
       declareParameter(source + "." + class_type + ".mark_confidence", rclcpp::ParameterValue(0));
       declareParameter(source + "." + class_type + ".samples_to_max_cost", rclcpp::ParameterValue(0));
-              declareParameter(source + "." + class_type + ".dominant_priority", rclcpp::ParameterValue(false));
+      declareParameter(source + "." + class_type + ".dominant_priority", rclcpp::ParameterValue(false));
       
       node->get_parameter(name_ + "." + source + "." + class_type + ".classes", classes_ids);
       if (classes_ids.empty())
@@ -153,12 +113,16 @@ void SemanticSegmentationLayer::onInitialize()
         RCLCPP_ERROR(logger_, "no classes defined on type %s", class_type.c_str());
         continue;
       }
+      
+      // Store the mapping for the buffer
+      class_type_to_names[class_type] = classes_ids;
+      
       CostHeuristicParams cost_params;
       node->get_parameter(name_ + "." + source + "." + class_type + ".base_cost", cost_params.base_cost);
       node->get_parameter(name_ + "." + source + "." + class_type + ".max_cost", cost_params.max_cost);
       node->get_parameter(name_ + "." + source + "." + class_type + ".mark_confidence", cost_params.mark_confidence);
       node->get_parameter(name_ + "." + source + "." + class_type + ".samples_to_max_cost", cost_params.samples_to_max_cost);
-                   node->get_parameter(name_ + "." + source + "." + class_type + ".dominant_priority", cost_params.dominant_priority);
+      node->get_parameter(name_ + "." + source + "." + class_type + ".dominant_priority", cost_params.dominant_priority);
       
       for (auto& class_id : classes_ids)
       {
@@ -175,20 +139,17 @@ void SemanticSegmentationLayer::onInitialize()
     //sensor data subscriptions
     auto sub_opt = rclcpp::SubscriptionOptions();
     sub_opt.callback_group = callback_group_;
-    rmw_qos_profile_t custom_qos_profile = rmw_qos_profile_sensor_data;
+    rclcpp::QoS custom_qos_profile = rclcpp::SensorDataQoS();
 
     // label info subscription
     rclcpp::SubscriptionOptionsWithAllocator<std::allocator<void>> tl_sub_opt;
     tl_sub_opt.use_intra_process_comm = rclcpp::IntraProcessSetting::Disable;
     tl_sub_opt.callback_group = callback_group_;
-    rmw_qos_profile_t tl_qos = rmw_qos_profile_system_default;
-    tl_qos.history = RMW_QOS_POLICY_HISTORY_KEEP_ALL;
-    tl_qos.depth = 5;
-    tl_qos.reliability = RMW_QOS_POLICY_RELIABILITY_RELIABLE;
-    tl_qos.durability = RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL;
+    rclcpp::QoS tl_qos(5);
+    tl_qos.keep_all().reliable().transient_local();
 
     auto segmentation_buffer = std::make_shared<semantic_segmentation_layer::SegmentationBuffer>(
-      node, source, class_types_string, class_map, observation_keep_time, expected_update_rate, max_obstacle_distance,
+      node, source, class_types_string, class_map, class_type_to_names, observation_keep_time, expected_update_rate, max_obstacle_distance,
       min_obstacle_distance, *tf_, global_frame_, sensor_frame,
       tf2::durationFromSec(transform_tolerance), getResolution(), tile_map_decay_time, visualize_tile_map,
       use_cost_selection);
@@ -196,18 +157,19 @@ void SemanticSegmentationLayer::onInitialize()
     segmentation_buffers_.push_back(segmentation_buffer);
     
 
+    rclcpp::Node* node_ptr = dynamic_cast<rclcpp::Node*>(node.get());
     auto semantic_segmentation_sub =
-      std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image, rclcpp_lifecycle::LifecycleNode>>(
-        node, segmentation_topic, custom_qos_profile, sub_opt);
+      std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(
+        node_ptr, segmentation_topic, custom_qos_profile.get_rmw_qos_profile(), sub_opt);
     semantic_segmentation_subs_.push_back(semantic_segmentation_sub);
 
-    auto label_info_sub = std::make_shared<message_filters::Subscriber<vision_msgs::msg::LabelInfo, rclcpp_lifecycle::LifecycleNode>>(
-        node, labels_topic, tl_qos, tl_sub_opt);
+    auto label_info_sub = std::make_shared<message_filters::Subscriber<vision_msgs::msg::LabelInfo>>(
+        node_ptr, labels_topic, tl_qos.get_rmw_qos_profile(), tl_sub_opt);
     label_info_sub->registerCallback(std::bind(&SemanticSegmentationLayer::labelinfoCb, this, std::placeholders::_1, segmentation_buffers_.back()));
     label_info_subs_.push_back(label_info_sub);
 
-    auto pointcloud_sub = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::PointCloud2, rclcpp_lifecycle::LifecycleNode>>(
-      node, pointcloud_topic, custom_qos_profile, sub_opt);
+    auto pointcloud_sub = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::PointCloud2>>(
+      node_ptr, pointcloud_topic, custom_qos_profile.get_rmw_qos_profile(), sub_opt);
     pointcloud_subs_.push_back(pointcloud_sub);
 
     auto pointcloud_tf_sub = std::make_shared<tf2_ros::MessageFilter<sensor_msgs::msg::PointCloud2>>(
@@ -219,13 +181,13 @@ void SemanticSegmentationLayer::onInitialize()
     if(!confidence_topic.empty())
     {
       auto semantic_segmentation_confidence_sub =
-      std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image, rclcpp_lifecycle::LifecycleNode>>(
-        node, confidence_topic, custom_qos_profile, sub_opt);
+      std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(
+        node_ptr, confidence_topic, custom_qos_profile.get_rmw_qos_profile(), sub_opt);
       semantic_segmentation_confidence_subs_.push_back(semantic_segmentation_confidence_sub);
       auto segm_conf_pc_sync =
         std::make_shared<message_filters::TimeSynchronizer<sensor_msgs::msg::Image, sensor_msgs::msg::Image,
-                                                          sensor_msgs::msg::PointCloud2>>(
-          *semantic_segmentation_subs_.back(), *semantic_segmentation_confidence_subs_.back(), *pointcloud_tf_subs_.back(), 1000);
+                                                          sensor_msgs::msg::PointCloud2>>(1000);
+      segm_conf_pc_sync->connectInput(*semantic_segmentation_subs_.back(), *semantic_segmentation_confidence_subs_.back(), *pointcloud_tf_subs_.back());
       segm_conf_pc_sync->registerCallback(std::bind(&SemanticSegmentationLayer::syncSegmConfPointcloudCb, this,
                                                 std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, segmentation_buffers_.back()));
       segm_conf_pc_notifiers_.push_back(segm_conf_pc_sync);
@@ -236,8 +198,8 @@ void SemanticSegmentationLayer::onInitialize()
       RCLCPP_WARN(logger_, "Confidence topic was empty for source %s, not using segmentation confidence in that source", source.c_str());
       auto segm_pc_sync =
         std::make_shared<message_filters::TimeSynchronizer<sensor_msgs::msg::Image,
-                                                          sensor_msgs::msg::PointCloud2>>(
-          *semantic_segmentation_subs_.back(), *pointcloud_tf_subs_.back(), 1000);
+                                                          sensor_msgs::msg::PointCloud2>>(1000);
+      segm_pc_sync->connectInput(*semantic_segmentation_subs_.back(), *pointcloud_tf_subs_.back());
       segm_pc_sync->registerCallback(std::bind(&SemanticSegmentationLayer::syncSegmPointcloudCb, this,
                                                 std::placeholders::_1, std::placeholders::_2, segmentation_buffers_.back()));
       segm_pc_notifiers_.push_back(segm_pc_sync);
@@ -509,52 +471,40 @@ SemanticSegmentationLayer::dynamicParametersCallback(
         for(auto & buffer : segmentation_buffers_) {
           if (buffer->getBufferSource() == source) {
             for(auto & class_type : buffer->getClassTypes()){
+              // Get class names from buffer instead of reading parameter
+              auto class_names_for_type = buffer->getClassNamesForType(class_type);
+              
               if (name == name_ + "." + source +  "." + class_type + "." + "base_cost") {
-                CostHeuristicParams cost_params;
-                std::vector<std::string> class_names_for_type;
-                node_.lock()->get_parameter(name_ + "." + source + "." + class_type + ".classes", class_names_for_type);
                 for(auto & class_name : class_names_for_type){
-                  cost_params = buffer->getCostForClassName(class_name);
+                  CostHeuristicParams cost_params = buffer->getCostForClassName(class_name);
                   cost_params.base_cost = parameter.as_int();
                   buffer->updateClassMap(class_name, cost_params);
                 }
               }
               if (name == name_ + "." + source +  "." + class_type + "." + "max_cost") {
-                CostHeuristicParams cost_params;
-                std::vector<std::string> class_names_for_type;
-                node_.lock()->get_parameter(name_ + "." + source + "." + class_type + ".classes", class_names_for_type);
                 for(auto & class_name : class_names_for_type){
-                  cost_params = buffer->getCostForClassName(class_name);
+                  CostHeuristicParams cost_params = buffer->getCostForClassName(class_name);
                   cost_params.max_cost = parameter.as_int();
                   buffer->updateClassMap(class_name, cost_params);
                 }
               }
               if (name == name_ + "." + source +  "." + class_type + "." + "mark_confidence") {
-                CostHeuristicParams cost_params;
-                std::vector<std::string> class_names_for_type;
-                node_.lock()->get_parameter(name_ + "." + source + "." + class_type + ".classes", class_names_for_type);
                 for(auto & class_name : class_names_for_type){
-                  cost_params = buffer->getCostForClassName(class_name);
+                  CostHeuristicParams cost_params = buffer->getCostForClassName(class_name);
                   cost_params.mark_confidence = parameter.as_int();
                   buffer->updateClassMap(class_name, cost_params);
                 }
               }
               if (name == name_ + "." + source +  "." + class_type + "." + "samples_to_max_cost") {
-                CostHeuristicParams cost_params;
-                std::vector<std::string> class_names_for_type;
-                node_.lock()->get_parameter(name_ + "." + source + "." + class_type + ".classes", class_names_for_type);
                 for(auto & class_name : class_names_for_type){
-                  cost_params = buffer->getCostForClassName(class_name);
+                  CostHeuristicParams cost_params = buffer->getCostForClassName(class_name);
                   cost_params.samples_to_max_cost = parameter.as_int();
                   buffer->updateClassMap(class_name, cost_params);
                 }
               }
               if (name == name_ + "." + source +  "." + class_type + ".dominant_priority") {
-                CostHeuristicParams cost_params;
-                std::vector<std::string> class_names_for_type;
-                node_.lock()->get_parameter(name_ + "." + source + "." + class_type + ".classes", class_names_for_type);
                 for(auto & class_name : class_names_for_type){
-                  cost_params = buffer->getCostForClassName(class_name);
+                  CostHeuristicParams cost_params = buffer->getCostForClassName(class_name);
                   cost_params.dominant_priority = parameter.as_bool();
                   buffer->updateClassMap(class_name, cost_params);
                 }
