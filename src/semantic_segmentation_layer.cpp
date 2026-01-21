@@ -1,8 +1,11 @@
 #include "semantic_segmentation_layer/semantic_segmentation_layer.hpp"
 
+#include <algorithm>
+
 #include "nav2_costmap_2d/costmap_math.hpp"
 #include "nav2_costmap_2d/footprint.hpp"
 #include "rclcpp/parameter_events_filter.hpp"
+#include "rmw/qos_profiles.h"
 
 using nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE;
 using nav2_costmap_2d::LETHAL_OBSTACLE;
@@ -24,7 +27,7 @@ void SemanticSegmentationLayer::onInitialize()
   {
     throw std::runtime_error{"Failed to lock node"};
   }
-  std::string segmentation_topic, confidence_topic, pointcloud_topic, labels_topic, sensor_frame;
+  std::string segmentation_topic, confidence_topic, pointcloud_topic, labels_topic;
   std::vector<std::string> class_types_string;
   double max_obstacle_distance, min_obstacle_distance, observation_keep_time, transform_tolerance,
     expected_update_rate, tile_map_decay_time;
@@ -64,7 +67,6 @@ void SemanticSegmentationLayer::onInitialize()
     declareParameter(source + "." + "labels_topic", rclcpp::ParameterValue(""));
     declareParameter(source + "." + "pointcloud_topic", rclcpp::ParameterValue(""));
     declareParameter(source + "." + "observation_persistence", rclcpp::ParameterValue(0.0));
-    declareParameter(source + "." + "sensor_frame", rclcpp::ParameterValue(""));
     declareParameter(source + "." + "expected_update_rate", rclcpp::ParameterValue(0.0));
     declareParameter(source + "." + "class_types", rclcpp::ParameterValue(std::vector<std::string>({})));
     declareParameter(source + "." + "max_obstacle_distance", rclcpp::ParameterValue(5.0));
@@ -78,7 +80,6 @@ void SemanticSegmentationLayer::onInitialize()
     node->get_parameter(name_ + "." + source + "." + "labels_topic", labels_topic);
     node->get_parameter(name_ + "." + source + "." + "pointcloud_topic", pointcloud_topic);
     node->get_parameter(name_ + "." + source + "." + "observation_persistence", observation_keep_time);
-    node->get_parameter(name_ + "." + source + "." + "sensor_frame", sensor_frame);
     node->get_parameter(name_ + "." + source + "." + "expected_update_rate", expected_update_rate);
     node->get_parameter(name_ + "." + source + "." + "class_types", class_types_string);
     node->get_parameter(name_ + "." + source + "." + "max_obstacle_distance", max_obstacle_distance);
@@ -139,50 +140,56 @@ void SemanticSegmentationLayer::onInitialize()
     //sensor data subscriptions
     auto sub_opt = rclcpp::SubscriptionOptions();
     sub_opt.callback_group = callback_group_;
-    rclcpp::QoS custom_qos_profile = rclcpp::SensorDataQoS();
+    rmw_qos_profile_t custom_qos_profile = rmw_qos_profile_sensor_data;
+    custom_qos_profile.depth = 50;
 
     // label info subscription
     rclcpp::SubscriptionOptionsWithAllocator<std::allocator<void>> tl_sub_opt;
     tl_sub_opt.use_intra_process_comm = rclcpp::IntraProcessSetting::Disable;
     tl_sub_opt.callback_group = callback_group_;
-    rclcpp::QoS tl_qos(5);
-    tl_qos.keep_all().reliable().transient_local();
+    rmw_qos_profile_t tl_qos_profile = rmw_qos_profile_default;
+    tl_qos_profile.depth = 5;
+    tl_qos_profile.reliability = RMW_QOS_POLICY_RELIABILITY_RELIABLE;
+    tl_qos_profile.durability = RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL;
 
     auto segmentation_buffer = std::make_shared<semantic_segmentation_layer::SegmentationBuffer>(
       node, source, class_types_string, class_map, class_type_to_names, observation_keep_time, expected_update_rate, max_obstacle_distance,
-      min_obstacle_distance, *tf_, global_frame_, sensor_frame,
+      min_obstacle_distance, *tf_, global_frame_, "",
       tf2::durationFromSec(transform_tolerance), getResolution(), tile_map_decay_time, visualize_tile_map,
       use_cost_selection);
 
     segmentation_buffers_.push_back(segmentation_buffer);
     
-
-    rclcpp::Node* node_ptr = dynamic_cast<rclcpp::Node*>(node.get());
     auto semantic_segmentation_sub =
-      std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(
-        node_ptr, segmentation_topic, custom_qos_profile.get_rmw_qos_profile(), sub_opt);
+      std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image, rclcpp_lifecycle::LifecycleNode>>(
+        node, segmentation_topic, custom_qos_profile, sub_opt);
+    semantic_segmentation_sub->unsubscribe();
     semantic_segmentation_subs_.push_back(semantic_segmentation_sub);
 
-    auto label_info_sub = std::make_shared<message_filters::Subscriber<vision_msgs::msg::LabelInfo>>(
-        node_ptr, labels_topic, tl_qos.get_rmw_qos_profile(), tl_sub_opt);
+    auto label_info_sub = std::make_shared<message_filters::Subscriber<vision_msgs::msg::LabelInfo, rclcpp_lifecycle::LifecycleNode>>(
+        node, labels_topic, tl_qos_profile, tl_sub_opt);
     label_info_sub->registerCallback(std::bind(&SemanticSegmentationLayer::labelinfoCb, this, std::placeholders::_1, segmentation_buffers_.back()));
+    label_info_sub->unsubscribe();
     label_info_subs_.push_back(label_info_sub);
 
-    auto pointcloud_sub = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::PointCloud2>>(
-      node_ptr, pointcloud_topic, custom_qos_profile.get_rmw_qos_profile(), sub_opt);
+    auto pointcloud_sub = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::PointCloud2, rclcpp_lifecycle::LifecycleNode>>(
+      node, pointcloud_topic, custom_qos_profile, sub_opt);
+    pointcloud_sub->unsubscribe();
     pointcloud_subs_.push_back(pointcloud_sub);
 
     auto pointcloud_tf_sub = std::make_shared<tf2_ros::MessageFilter<sensor_msgs::msg::PointCloud2>>(
-      *pointcloud_subs_.back(), *tf_, global_frame_, 1000, node->get_node_logging_interface(),
-          node->get_node_clock_interface(),
-          tf2::durationFromSec(transform_tolerance));
+      *pointcloud_subs_.back(), *tf_, global_frame_, 50,
+      node->get_node_logging_interface(),
+      node->get_node_clock_interface(),
+      tf2::durationFromSec(transform_tolerance));
     pointcloud_tf_subs_.push_back(pointcloud_tf_sub);
 
     if(!confidence_topic.empty())
     {
       auto semantic_segmentation_confidence_sub =
-      std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(
-        node_ptr, confidence_topic, custom_qos_profile.get_rmw_qos_profile(), sub_opt);
+      std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image, rclcpp_lifecycle::LifecycleNode>>(
+        node, confidence_topic, custom_qos_profile, sub_opt);
+      semantic_segmentation_confidence_sub->unsubscribe();
       semantic_segmentation_confidence_subs_.push_back(semantic_segmentation_confidence_sub);
       auto segm_conf_pc_sync =
         std::make_shared<message_filters::TimeSynchronizer<sensor_msgs::msg::Image, sensor_msgs::msg::Image,
@@ -518,6 +525,56 @@ SemanticSegmentationLayer::dynamicParametersCallback(
 
   result.successful = true;
   return result;
+}
+
+void SemanticSegmentationLayer::activate()
+{
+  // Subscribe to all topics
+  for (unsigned int i = 0; i < semantic_segmentation_subs_.size(); ++i) {
+    if (semantic_segmentation_subs_[i] != NULL) {
+      semantic_segmentation_subs_[i]->subscribe();
+    }
+  }
+  for (unsigned int i = 0; i < semantic_segmentation_confidence_subs_.size(); ++i) {
+    if (semantic_segmentation_confidence_subs_[i] != NULL) {
+      semantic_segmentation_confidence_subs_[i]->subscribe();
+    }
+  }
+  for (unsigned int i = 0; i < label_info_subs_.size(); ++i) {
+    if (label_info_subs_[i] != NULL) {
+      label_info_subs_[i]->subscribe();
+    }
+  }
+  for (unsigned int i = 0; i < pointcloud_subs_.size(); ++i) {
+    if (pointcloud_subs_[i] != NULL) {
+      pointcloud_subs_[i]->subscribe();
+    }
+  }
+}
+
+void SemanticSegmentationLayer::deactivate()
+{
+  // Unsubscribe from all topics
+  for (unsigned int i = 0; i < semantic_segmentation_subs_.size(); ++i) {
+    if (semantic_segmentation_subs_[i] != NULL) {
+      semantic_segmentation_subs_[i]->unsubscribe();
+    }
+  }
+  for (unsigned int i = 0; i < semantic_segmentation_confidence_subs_.size(); ++i) {
+    if (semantic_segmentation_confidence_subs_[i] != NULL) {
+      semantic_segmentation_confidence_subs_[i]->unsubscribe();
+    }
+  }
+  for (unsigned int i = 0; i < label_info_subs_.size(); ++i) {
+    if (label_info_subs_[i] != NULL) {
+      label_info_subs_[i]->unsubscribe();
+    }
+  }
+  for (unsigned int i = 0; i < pointcloud_subs_.size(); ++i) {
+    if (pointcloud_subs_[i] != NULL) {
+      pointcloud_subs_[i]->unsubscribe();
+    }
+  }
 }
 
 }  // namespace semantic_segmentation_layer

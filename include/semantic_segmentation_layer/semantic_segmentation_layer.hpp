@@ -77,6 +77,16 @@ class SemanticSegmentationLayer : public nav2_costmap_2d::CostmapLayer
     virtual bool isClearable() { return true; }
 
     /**
+     * @brief Activate this layer - subscribe to topics
+     */
+    virtual void activate();
+
+    /**
+     * @brief Deactivate this layer - unsubscribe from topics
+     */
+    virtual void deactivate();
+
+    /**
      * @brief Get the buffers and the tile maps the plugin stores. one for each source. Takes a vector of tile maps
      * as reference and fills it inside the function
      * @param segmentation_tile_maps the vector of tile maps to be filled by the function
@@ -99,13 +109,13 @@ class SemanticSegmentationLayer : public nav2_costmap_2d::CostmapLayer
     void labelinfoCb(const std::shared_ptr<const vision_msgs::msg::LabelInfo>& label_info,
                      const std::shared_ptr<semantic_segmentation_layer::SegmentationBuffer>& buffer);
 
-    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image>>>
+    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image, rclcpp_lifecycle::LifecycleNode>>>
         semantic_segmentation_subs_;
-    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image>>>
+    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image, rclcpp_lifecycle::LifecycleNode>>>
         semantic_segmentation_confidence_subs_;
-    std::vector<std::shared_ptr<message_filters::Subscriber<vision_msgs::msg::LabelInfo>>>
+    std::vector<std::shared_ptr<message_filters::Subscriber<vision_msgs::msg::LabelInfo, rclcpp_lifecycle::LifecycleNode>>>
         label_info_subs_;
-    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::PointCloud2>>>
+    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::PointCloud2, rclcpp_lifecycle::LifecycleNode>>>
         pointcloud_subs_;
     std::vector<
         std::shared_ptr<message_filters::TimeSynchronizer<sensor_msgs::msg::Image, sensor_msgs::msg::PointCloud2>>>
