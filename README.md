@@ -125,7 +125,3 @@ semantic_segmentation_layer:
 
 This plugin draws inspiration from the [Spatio-Temporal Voxel Layer](https://github.com/SteveMacenski/spatio_temporal_voxel_layer), extending the concept of temporal buffering to semantic segmentation data with multi-class queue management.
 
-## License
-
-BSD-3-Clause
-
