@@ -76,6 +76,13 @@ The image below provides a visual explanation of how the plugin works. In this d
   - Middle tile: Green observation arrives. Green queue now has more observations than purple, so green becomes dominant and the tile marks green's cost. Purple has been purged by green
   - Right tile: Blue observation arrives. Blue queue now has 3 observations vs green's 2. If blue's average confidence exceeds `mark_confidence`, tile is marked with blue's `max_cost`
 
+## Required Topics and Message Types
+
+- **`segmentation_topic`**: [`sensor_msgs/Image`](https://docs.ros2.org/latest/api/sensor_msgs/msg/Image.html) (mono8) - Semantic segmentation mask where each pixel value is a class ID. QoS: sensor data (best effort).
+- **`pointcloud_topic`**: [`sensor_msgs/PointCloud2`](https://docs.ros2.org/latest/api/sensor_msgs/msg/PointCloud2.html) - Aligned 3D pointcloud providing (x,y,z) world coordinates for each segmentation pixel. Must be pixel-aligned and time-synchronized with segmentation. QoS: sensor data (best effort).
+- **`confidence_topic`** (optional): [`sensor_msgs/Image`](https://docs.ros2.org/latest/api/sensor_msgs/msg/Image.html) (mono8) - Per-pixel neural network confidence values (0-255). Must be time-synchronized with segmentation and pointcloud. QoS: sensor data (best effort).
+- **`labels_topic`**: [`vision_msgs/LabelInfo`](https://github.com/ros-perception/vision_msgs/blob/ros2/msg/LabelInfo.msg) - Mapping between class names and class IDs. Must be published before segmentation processing begins. QoS: reliable, transient local.
+
 ## Configuration
 
 Below is a sample configuration for the plugin with the more relevant parameters commented:
@@ -93,7 +100,7 @@ semantic_segmentation_layer:
     observation_persistence: 0.0
     expected_update_rate: 0.0
     visualize_tile_map: False
-    use_cost_selection: False  # If true, select observation per tile using highest max_cost. If false, use highest confidence
+    use_cost_selection: False  # If true, select observation per tile using highest max_cost in case multile observations fall in a single tile on one image. If false, use highest confidence
     max_obstacle_distance: 5.0
     min_obstacle_distance: 0.3
     tile_map_decay_time: 5.0
