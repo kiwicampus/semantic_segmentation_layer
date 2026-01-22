@@ -1,6 +1,6 @@
 # Semantic Segmentation Layer
 
-A custom nav2 costmap layer plugin that integrates semantic segmentation data into the navigation costmap. It was developed by [@pepisg]() and [@sunart24] at [robot.com](robot.com)
+A custom nav2 costmap layer plugin that integrates semantic segmentation data into the navigation costmap. It was developed by [@pepisg](https://github.com/pepisg) and [@sunart24](https://github.com/sunart24) at [robot.com](robot.com)
 
 ## Overview
 
