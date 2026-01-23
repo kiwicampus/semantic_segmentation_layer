@@ -132,3 +132,30 @@ semantic_segmentation_layer:
 
 This plugin draws inspiration from the [Spatio-Temporal Voxel Layer](https://github.com/SteveMacenski/spatio_temporal_voxel_layer), extending the concept of temporal buffering to semantic segmentation data with multi-class queue management.
 
+## Citation
+
+If you use this plugin in your research or project, please cite it as:
+
+```bibtex
+@software{semantic_segmentation_layer,
+  author = {Gonzale, Pedro and Solarte, Johan},
+  title = {Semantic Segmentation Layer: A Nav2 Costmap Plugin for RGBD Semantic Segmentation},
+  year = {2026},
+  url = {https://github.com/kiwicampus/semantic_segmentation_layer}
+}
+```
+
+## Contributing
+
+Contributions are welcome! If you'd like to contribute:
+
+1. Fork the repository
+2. Create a feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit your changes (`git commit -m 'Add amazing feature'`)
+4. Push to the branch (`git push origin feature/amazing-feature`)
+5. Open a Pull Request
+
+## License
+
+This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+

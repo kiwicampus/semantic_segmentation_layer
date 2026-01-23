@@ -7,8 +7,9 @@
     A nav2 costmap layer plugin for semantic segmentation that integrates
     semantic segmentation data into the navigation costmap.
   </description>
-  <maintainer email="user@example.com">User</maintainer>
-  <license>BSD-3-Clause</license>
+  <maintainer email="pepisg@robot.com">Pedro Gonzalez</maintainer>
+  <maintainer email="sunart24@robot.com">Johan Solarte</maintainer>
+  <license>MIT</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <build_depend>nav2_common</build_depend>
