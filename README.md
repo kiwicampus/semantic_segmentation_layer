@@ -1,10 +1,16 @@
+![robot.com banner](docs/banner.png)
+
 # Semantic Segmentation Layer
 
-A custom nav2 costmap layer plugin that integrates semantic segmentation data into the navigation costmap. It was developed by [@pepisg](https://github.com/pepisg) and [@sunart24](https://github.com/sunart24) at [robot.com](robot.com)
+A custom nav2 costmap layer plugin inspired on stvl, that integrates semantic segmentation data into the navigation costmap. It was developed by [@pepisg](https://github.com/pepisg) and [@sunart24](https://github.com/sunart24) at [robot.com](robot.com)
 
 ## Overview
 
 This plugin is designed for **RGBD sensors** (depth cameras with semantic segmentation) and populates the costmap with segmentation masks, aligned pointclouds containing the x, y, and z coordinates of each pixel in the mask, and optionally confidence masks that contain the inference confidence of each pixel. The aligned pointcloud is essential for mapping image pixels to costmap tiles in 3D space. It is a custom made plugin that integrates with the Nav2 navigation stack.
+
+Refer to the [nav2_segmentation_demo](https://github.com/pepisg/nav2_segmentation_demo) repo, which shows how to create simple models and run them on gazebo simulations.
+
+![video](docs/video.gif)
 
 ## Key Concepts
 
@@ -131,6 +137,10 @@ semantic_segmentation_layer:
 ## Acknowledgments
 
 This plugin draws inspiration from the [Spatio-Temporal Voxel Layer](https://github.com/SteveMacenski/spatio_temporal_voxel_layer), extending the concept of temporal buffering to semantic segmentation data with multi-class queue management.
+
+## Motivation
+
+This plugin was created as an alternative to include semantic segmentation data in nav2, which is an important perception source when traversability is not based only on geometric features (obstacles), but also on the characteristics of the surfaces robots encounter while moving.
 
 ## Citation
 
