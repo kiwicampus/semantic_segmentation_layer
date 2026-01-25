@@ -1,8 +1,8 @@
 /*********************************************************************
  *
- * Software License Agreement (BSD License)
+ * Software License Agreement
  *
- *  Copyright (c) 2008, 2013, Willow Garage, Inc.
+ *  Copyright (c) 2026, robot.com
  *  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
@@ -15,7 +15,7 @@
  *     copyright notice, this list of conditions and the following
  *     disclaimer in the documentation and/or other materials provided
  *     with the distribution.
- *   * Neither the name of Willow Garage, Inc. nor the names of its
+ *   * Neither the name of robot.com nor the names of its
  *     contributors may be used to endorse or promote products derived
  *     from this software without specific prior written permission.
  *
@@ -32,7 +32,8 @@
  *  ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
  *  POSSIBILITY OF SUCH DAMAGE.
  *
- * Author: Eitan Marder-Eppstein
+ * Authors: Pedro Gonzalez (pedro@robot.com)
+ *          Johan Solarte (jsolarte@robot.com)
  *********************************************************************/
 #include "semantic_segmentation_layer/segmentation_buffer.hpp"
 

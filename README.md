@@ -8,7 +8,7 @@ A custom nav2 costmap layer plugin inspired on stvl, that integrates semantic se
 
 This plugin is designed for **RGBD sensors** (depth cameras with semantic segmentation) and populates the costmap with segmentation masks, aligned pointclouds containing the x, y, and z coordinates of each pixel in the mask, and optionally confidence masks that contain the inference confidence of each pixel. The aligned pointcloud is essential for mapping image pixels to costmap tiles in 3D space. It is a custom made plugin that integrates with the Nav2 navigation stack.
 
-Refer to the [nav2_segmentation_demo](https://github.com/pepisg/nav2_segmentation_demo) repo, which shows how to create simple models and run them on gazebo simulations.
+For a detailed example on how to use the layer, refer to the [nav2_segmentation_demo](https://github.com/pepisg/nav2_segmentation_demo) repo, which shows how to create simple ML models and run them on gazebo simulations.
 
 ![video](docs/video.gif)
 
