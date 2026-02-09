@@ -42,6 +42,8 @@
 #include <list>
 #include <string>
 #include <vector>
+#include <deque>
+
 
 #include "nav2_util/lifecycle_node.hpp"
 #include "rclcpp/time.hpp"
