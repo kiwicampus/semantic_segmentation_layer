@@ -41,8 +41,8 @@
 
 #include "nav2_costmap_2d/costmap_math.hpp"
 #include "nav2_costmap_2d/footprint.hpp"
+#include "nav2_ros_common/qos_profiles.hpp"
 #include "rclcpp/parameter_events_filter.hpp"
-#include "rmw/qos_profiles.h"
 
 using nav2_costmap_2d::INSCRIBED_INFLATED_OBSTACLE;
 using nav2_costmap_2d::LETHAL_OBSTACLE;
@@ -70,10 +70,10 @@ void SemanticSegmentationLayer::onInitialize()
     expected_update_rate, tile_map_decay_time;
   bool track_unknown_space, visualize_tile_map;
 
-  declareParameter("enabled", rclcpp::ParameterValue(true));
-  declareParameter("combination_method", rclcpp::ParameterValue(1));
-  declareParameter("observation_sources", rclcpp::ParameterValue(std::string("")));
-  declareParameter("publish_debug_topics", rclcpp::ParameterValue(false));
+  nav2::declare_parameter_if_not_declared(node, name_ + "." + "enabled", rclcpp::ParameterValue(true));
+  nav2::declare_parameter_if_not_declared(node, name_ + "." + "combination_method", rclcpp::ParameterValue(1));
+  nav2::declare_parameter_if_not_declared(node, name_ + "." + "observation_sources", rclcpp::ParameterValue(std::string("")));
+  nav2::declare_parameter_if_not_declared(node, name_ + "." + "publish_debug_topics", rclcpp::ParameterValue(false));
 
   node->get_parameter(name_ + "." + "enabled", enabled_);
   node->get_parameter(name_ + "." + "combination_method", combination_method_);
@@ -99,18 +99,18 @@ void SemanticSegmentationLayer::onInitialize()
   std::string source;
 
   while (ss >> source) {
-    declareParameter(source + "." + "segmentation_topic", rclcpp::ParameterValue(""));
-    declareParameter(source + "." + "confidence_topic", rclcpp::ParameterValue(""));
-    declareParameter(source + "." + "labels_topic", rclcpp::ParameterValue(""));
-    declareParameter(source + "." + "pointcloud_topic", rclcpp::ParameterValue(""));
-    declareParameter(source + "." + "observation_persistence", rclcpp::ParameterValue(0.0));
-    declareParameter(source + "." + "expected_update_rate", rclcpp::ParameterValue(0.0));
-    declareParameter(source + "." + "class_types", rclcpp::ParameterValue(std::vector<std::string>({})));
-    declareParameter(source + "." + "max_obstacle_distance", rclcpp::ParameterValue(5.0));
-    declareParameter(source + "." + "min_obstacle_distance", rclcpp::ParameterValue(0.3));
-    declareParameter(source + "." + "tile_map_decay_time", rclcpp::ParameterValue(5.0));
-    declareParameter(source + "." + "visualize_tile_map", rclcpp::ParameterValue(false));
-    declareParameter(source + "." + "use_cost_selection", rclcpp::ParameterValue(true));
+    nav2::declare_parameter_if_not_declared(node, name_ + "." + source + "." + "segmentation_topic", rclcpp::ParameterValue(""));
+    nav2::declare_parameter_if_not_declared(node, name_ + "." + source + "." + "confidence_topic", rclcpp::ParameterValue(""));
+    nav2::declare_parameter_if_not_declared(node, name_ + "." + source + "." + "labels_topic", rclcpp::ParameterValue(""));
+    nav2::declare_parameter_if_not_declared(node, name_ + "." + source + "." + "pointcloud_topic", rclcpp::ParameterValue(""));
+    nav2::declare_parameter_if_not_declared(node, name_ + "." + source + "." + "observation_persistence", rclcpp::ParameterValue(0.0));
+    nav2::declare_parameter_if_not_declared(node, name_ + "." + source + "." + "expected_update_rate", rclcpp::ParameterValue(0.0));
+    nav2::declare_parameter_if_not_declared(node, name_ + "." + source + "." + "class_types", rclcpp::ParameterValue(std::vector<std::string>({})));
+    nav2::declare_parameter_if_not_declared(node, name_ + "." + source + "." + "max_obstacle_distance", rclcpp::ParameterValue(5.0));
+    nav2::declare_parameter_if_not_declared(node, name_ + "." + source + "." + "min_obstacle_distance", rclcpp::ParameterValue(0.3));
+    nav2::declare_parameter_if_not_declared(node, name_ + "." + source + "." + "tile_map_decay_time", rclcpp::ParameterValue(5.0));
+    nav2::declare_parameter_if_not_declared(node, name_ + "." + source + "." + "visualize_tile_map", rclcpp::ParameterValue(false));
+    nav2::declare_parameter_if_not_declared(node, name_ + "." + source + "." + "use_cost_selection", rclcpp::ParameterValue(true));
     
     node->get_parameter(name_ + "." + source + "." + "segmentation_topic", segmentation_topic);
     node->get_parameter(name_ + "." + source + "." + "confidence_topic", confidence_topic);
@@ -138,12 +138,12 @@ void SemanticSegmentationLayer::onInitialize()
     for (auto& class_type : class_types_string)
     {
       std::vector<std::string> classes_ids;
-      declareParameter(source + "." + class_type + ".classes", rclcpp::ParameterValue(std::vector<std::string>({})));
-      declareParameter(source + "." + class_type + ".base_cost", rclcpp::ParameterValue(0));
-      declareParameter(source + "." + class_type + ".max_cost", rclcpp::ParameterValue(0));
-      declareParameter(source + "." + class_type + ".mark_confidence", rclcpp::ParameterValue(0));
-      declareParameter(source + "." + class_type + ".samples_to_max_cost", rclcpp::ParameterValue(0));
-      declareParameter(source + "." + class_type + ".dominant_priority", rclcpp::ParameterValue(false));
+      nav2::declare_parameter_if_not_declared(node, name_ + "." + source + "." + class_type + ".classes", rclcpp::ParameterValue(std::vector<std::string>({})));
+      nav2::declare_parameter_if_not_declared(node, name_ + "." + source + "." + class_type + ".base_cost", rclcpp::ParameterValue(0));
+      nav2::declare_parameter_if_not_declared(node, name_ + "." + source + "." + class_type + ".max_cost", rclcpp::ParameterValue(0));
+      nav2::declare_parameter_if_not_declared(node, name_ + "." + source + "." + class_type + ".mark_confidence", rclcpp::ParameterValue(0));
+      nav2::declare_parameter_if_not_declared(node, name_ + "." + source + "." + class_type + ".samples_to_max_cost", rclcpp::ParameterValue(0));
+      nav2::declare_parameter_if_not_declared(node, name_ + "." + source + "." + class_type + ".dominant_priority", rclcpp::ParameterValue(false));
       
       node->get_parameter(name_ + "." + source + "." + class_type + ".classes", classes_ids);
       if (classes_ids.empty())
@@ -177,17 +177,13 @@ void SemanticSegmentationLayer::onInitialize()
     //sensor data subscriptions
     auto sub_opt = rclcpp::SubscriptionOptions();
     sub_opt.callback_group = callback_group_;
-    rmw_qos_profile_t custom_qos_profile = rmw_qos_profile_sensor_data;
-    custom_qos_profile.depth = 50;
+    const auto custom_qos_profile = nav2::qos::SensorDataQoS(50);
 
     // label info subscription
     rclcpp::SubscriptionOptionsWithAllocator<std::allocator<void>> tl_sub_opt;
     tl_sub_opt.use_intra_process_comm = rclcpp::IntraProcessSetting::Disable;
     tl_sub_opt.callback_group = callback_group_;
-    rmw_qos_profile_t tl_qos_profile = rmw_qos_profile_default;
-    tl_qos_profile.depth = 5;
-    tl_qos_profile.reliability = RMW_QOS_POLICY_RELIABILITY_RELIABLE;
-    tl_qos_profile.durability = RMW_QOS_POLICY_DURABILITY_TRANSIENT_LOCAL;
+    rclcpp::QoS tl_qos_profile = nav2::qos::LatchedSubscriptionQoS(5);
 
     auto segmentation_buffer = std::make_shared<semantic_segmentation_layer::SegmentationBuffer>(
       node, source, class_types_string, class_map, class_type_to_names, observation_keep_time, expected_update_rate, max_obstacle_distance,
@@ -198,18 +194,18 @@ void SemanticSegmentationLayer::onInitialize()
     segmentation_buffers_.push_back(segmentation_buffer);
     
     auto semantic_segmentation_sub =
-      std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image, rclcpp_lifecycle::LifecycleNode>>(
+      std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(
         node, segmentation_topic, custom_qos_profile, sub_opt);
     semantic_segmentation_sub->unsubscribe();
     semantic_segmentation_subs_.push_back(semantic_segmentation_sub);
 
-    auto label_info_sub = std::make_shared<message_filters::Subscriber<vision_msgs::msg::LabelInfo, rclcpp_lifecycle::LifecycleNode>>(
+    auto label_info_sub = std::make_shared<message_filters::Subscriber<vision_msgs::msg::LabelInfo>>(
         node, labels_topic, tl_qos_profile, tl_sub_opt);
     label_info_sub->registerCallback(std::bind(&SemanticSegmentationLayer::labelinfoCb, this, std::placeholders::_1, segmentation_buffers_.back()));
     label_info_sub->unsubscribe();
     label_info_subs_.push_back(label_info_sub);
 
-    auto pointcloud_sub = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::PointCloud2, rclcpp_lifecycle::LifecycleNode>>(
+    auto pointcloud_sub = std::make_shared<message_filters::Subscriber<sensor_msgs::msg::PointCloud2>>(
       node, pointcloud_topic, custom_qos_profile, sub_opt);
     pointcloud_sub->unsubscribe();
     pointcloud_subs_.push_back(pointcloud_sub);
@@ -224,7 +220,7 @@ void SemanticSegmentationLayer::onInitialize()
     if(!confidence_topic.empty())
     {
       auto semantic_segmentation_confidence_sub =
-      std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image, rclcpp_lifecycle::LifecycleNode>>(
+      std::make_shared<message_filters::Subscriber<sensor_msgs::msg::Image>>(
         node, confidence_topic, custom_qos_profile, sub_opt);
       semantic_segmentation_confidence_sub->unsubscribe();
       semantic_segmentation_confidence_subs_.push_back(semantic_segmentation_confidence_sub);

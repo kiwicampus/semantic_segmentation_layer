@@ -49,7 +49,7 @@
 #include "nav2_costmap_2d/layer.hpp"
 #include "nav2_costmap_2d/layered_costmap.hpp"
 #include "semantic_segmentation_layer/segmentation_buffer.hpp"
-#include "nav2_util/node_utils.hpp"
+#include "nav2_ros_common/node_utils.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "tf2_ros/message_filter.hpp"
 #include "vision_msgs/msg/label_info.hpp"
@@ -146,13 +146,13 @@ class SemanticSegmentationLayer : public nav2_costmap_2d::CostmapLayer
     void labelinfoCb(const std::shared_ptr<const vision_msgs::msg::LabelInfo>& label_info,
                      const std::shared_ptr<semantic_segmentation_layer::SegmentationBuffer>& buffer);
 
-    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image, rclcpp_lifecycle::LifecycleNode>>>
+    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image>>>
         semantic_segmentation_subs_;
-    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image, rclcpp_lifecycle::LifecycleNode>>>
+    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image>>>
         semantic_segmentation_confidence_subs_;
-    std::vector<std::shared_ptr<message_filters::Subscriber<vision_msgs::msg::LabelInfo, rclcpp_lifecycle::LifecycleNode>>>
+    std::vector<std::shared_ptr<message_filters::Subscriber<vision_msgs::msg::LabelInfo>>>
         label_info_subs_;
-    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::PointCloud2, rclcpp_lifecycle::LifecycleNode>>>
+    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::PointCloud2>>>
         pointcloud_subs_;
     std::vector<
         std::shared_ptr<message_filters::TimeSynchronizer<sensor_msgs::msg::Image, sensor_msgs::msg::PointCloud2>>>

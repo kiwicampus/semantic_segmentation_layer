@@ -49,7 +49,7 @@
 using namespace std::chrono_literals;
 
 namespace semantic_segmentation_layer {
-SegmentationBuffer::SegmentationBuffer(const nav2_util::LifecycleNode::WeakPtr& parent,
+SegmentationBuffer::SegmentationBuffer(const nav2::LifecycleNode::WeakPtr& parent,
                                        std::string buffer_source, std::vector<std::string> class_types, std::unordered_map<std::string, CostHeuristicParams> class_names_cost_map,
                                        std::unordered_map<std::string, std::vector<std::string>> class_type_to_names,
                                        double observation_keep_time,
