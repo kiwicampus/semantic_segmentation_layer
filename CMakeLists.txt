@@ -12,7 +12,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(message_filters REQUIRED)
 find_package(nav2_costmap_2d REQUIRED)
 find_package(nav2_util REQUIRED)
-find_package(nav2_util REQUIRED)
+find_package(nav2_ros_common REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(pluginlib REQUIRED)
 find_package(rclcpp REQUIRED)
@@ -45,7 +45,7 @@ target_link_libraries(semantic_segmentation_layer
     message_filters::message_filters
     nav2_costmap_2d::nav2_costmap_2d_core
     nav2_util::nav2_util_core
-    nav2_util::nav2_util_core
+    nav2_ros_common::nav2_ros_common
     pluginlib::pluginlib
     rclcpp::rclcpp
     rclcpp_lifecycle::rclcpp_lifecycle

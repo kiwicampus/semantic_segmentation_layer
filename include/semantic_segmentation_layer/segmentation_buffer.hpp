@@ -43,7 +43,7 @@
 #include <string>
 #include <vector>
 
-#include "nav2_util/lifecycle_node.hpp"
+#include "nav2_ros_common/lifecycle_node.hpp"
 #include "rclcpp/time.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
@@ -670,7 +670,7 @@ class SegmentationBuffer
      * @param  tf_tolerance The amount of time to wait for a transform to be available when setting a
      * new global frame
      */
-    SegmentationBuffer(const nav2_util::LifecycleNode::WeakPtr& parent, std::string buffer_source,
+    SegmentationBuffer(const nav2::LifecycleNode::WeakPtr& parent, std::string buffer_source,
                        std::vector<std::string> class_types,
                        std::unordered_map<std::string, CostHeuristicParams> class_names_cost_map,
                        std::unordered_map<std::string, std::vector<std::string>> class_type_to_names,
