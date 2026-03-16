@@ -96,7 +96,7 @@ void SegmentationBuffer::createSegmentationCostMultimap(const vision_msgs::msg::
   {
     const auto& name = semantic_class.class_name;
     if (class_names_cost_map_.find(name) == class_names_cost_map_.end()) {
-      RCLCPP_ERROR(logger_, 
+      RCLCPP_INFO(logger_, 
         "CRITICAL ERROR: Class '%s' from label_info is not defined in the costmap parameters! This class will be ignored.", 
         name.c_str());
       continue;
