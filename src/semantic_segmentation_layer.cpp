@@ -74,9 +74,11 @@ void SemanticSegmentationLayer::onInitialize()
   declareParameter("combination_method", rclcpp::ParameterValue(1));
   declareParameter("observation_sources", rclcpp::ParameterValue(std::string("")));
   declareParameter("publish_debug_topics", rclcpp::ParameterValue(false));
+  declareParameter("use_approximate_time_sync", rclcpp::ParameterValue(true));
 
   node->get_parameter(name_ + "." + "enabled", enabled_);
   node->get_parameter(name_ + "." + "combination_method", combination_method_);
+  node->get_parameter(name_ + "." + "use_approximate_time_sync", use_approximate_time_sync_);
   node->get_parameter("track_unknown_space", track_unknown_space);
   node->get_parameter("transform_tolerance", transform_tolerance);  
 
@@ -228,25 +230,60 @@ void SemanticSegmentationLayer::onInitialize()
         node, confidence_topic, custom_qos_profile, sub_opt);
       semantic_segmentation_confidence_sub->unsubscribe();
       semantic_segmentation_confidence_subs_.push_back(semantic_segmentation_confidence_sub);
-      auto segm_conf_pc_sync =
-        std::make_shared<message_filters::TimeSynchronizer<sensor_msgs::msg::Image, sensor_msgs::msg::Image,
-                                                          sensor_msgs::msg::PointCloud2>>(1000);
-      segm_conf_pc_sync->connectInput(*semantic_segmentation_subs_.back(), *semantic_segmentation_confidence_subs_.back(), *pointcloud_tf_subs_.back());
-      segm_conf_pc_sync->registerCallback(std::bind(&SemanticSegmentationLayer::syncSegmConfPointcloudCb, this,
-                                                std::placeholders::_1, std::placeholders::_2, std::placeholders::_3, segmentation_buffers_.back()));
-      segm_conf_pc_notifiers_.push_back(segm_conf_pc_sync);
-       RCLCPP_INFO(logger_, "Confidence is enabled for source %s", source.c_str());
+      if (use_approximate_time_sync_)
+      {
+        auto segm_conf_pc_approx_sync = std::make_shared<ApproxSync3>(
+          ApproxSyncPolicy3(1000),
+          *semantic_segmentation_subs_.back(), *semantic_segmentation_confidence_subs_.back(),
+          *pointcloud_tf_subs_.back());
+        segm_conf_pc_approx_sync->setMaxIntervalDuration(rclcpp::Duration(0, 100000000));
+        segm_conf_pc_approx_sync->registerCallback(std::bind(
+          &SemanticSegmentationLayer::syncSegmConfPointcloudCb, this,
+          std::placeholders::_1, std::placeholders::_2,
+          std::placeholders::_3, segmentation_buffers_.back()));
+        segm_conf_pc_notifiers_.push_back(segm_conf_pc_approx_sync);
+        RCLCPP_INFO(
+          logger_, "Confidence is enabled for source %s (using ApproximateTime sync)",
+          source.c_str());
+      }
+      else
+      {
+        auto segm_conf_pc_sync = std::make_shared<ExactSync3>(
+          *semantic_segmentation_subs_.back(), *semantic_segmentation_confidence_subs_.back(),
+          *pointcloud_tf_subs_.back(), 1000);
+        segm_conf_pc_sync->registerCallback(std::bind(
+          &SemanticSegmentationLayer::syncSegmConfPointcloudCb, this,
+          std::placeholders::_1, std::placeholders::_2,
+          std::placeholders::_3, segmentation_buffers_.back()));
+        segm_conf_pc_notifiers_.push_back(segm_conf_pc_sync);
+        RCLCPP_INFO(
+          logger_, "Confidence is enabled for source %s (using ExactTime sync)",
+          source.c_str());
+      }
     }
     else
     {
       RCLCPP_WARN(logger_, "Confidence topic was empty for source %s, not using segmentation confidence in that source", source.c_str());
-      auto segm_pc_sync =
-        std::make_shared<message_filters::TimeSynchronizer<sensor_msgs::msg::Image,
-                                                          sensor_msgs::msg::PointCloud2>>(1000);
-      segm_pc_sync->connectInput(*semantic_segmentation_subs_.back(), *pointcloud_tf_subs_.back());
-      segm_pc_sync->registerCallback(std::bind(&SemanticSegmentationLayer::syncSegmPointcloudCb, this,
-                                                std::placeholders::_1, std::placeholders::_2, segmentation_buffers_.back()));
-      segm_pc_notifiers_.push_back(segm_pc_sync);
+      if (use_approximate_time_sync_)
+      {
+        auto segm_pc_approx_sync = std::make_shared<ApproxSync2>(
+          ApproxSyncPolicy2(1000),
+          *semantic_segmentation_subs_.back(), *pointcloud_tf_subs_.back());
+        segm_pc_approx_sync->setMaxIntervalDuration(rclcpp::Duration(0, 100000000));
+        segm_pc_approx_sync->registerCallback(std::bind(
+          &SemanticSegmentationLayer::syncSegmPointcloudCb, this,
+          std::placeholders::_1, std::placeholders::_2, segmentation_buffers_.back()));
+        segm_pc_notifiers_.push_back(segm_pc_approx_sync);
+      }
+      else
+      {
+        auto segm_pc_sync = std::make_shared<ExactSync2>(
+          *semantic_segmentation_subs_.back(), *pointcloud_tf_subs_.back(), 1000);
+        segm_pc_sync->registerCallback(std::bind(
+          &SemanticSegmentationLayer::syncSegmPointcloudCb, this,
+          std::placeholders::_1, std::placeholders::_2, segmentation_buffers_.back()));
+        segm_pc_notifiers_.push_back(segm_pc_sync);
+      }
     }
   }
 
