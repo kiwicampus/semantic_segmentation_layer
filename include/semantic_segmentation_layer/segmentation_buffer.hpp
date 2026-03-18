@@ -40,17 +40,23 @@
 #define SEMANTIC_SEGMENTATION_LAYER__SEGMENTATION_BUFFER_HPP_
 
 #include <list>
+#include <algorithm>
+#include <cmath>
+#include <optional>
 #include <string>
 #include <vector>
 
+#include "Eigen/Geometry"
 #include "nav2_util/lifecycle_node.hpp"
+#include "rclcpp/rclcpp.hpp"
 #include "rclcpp/time.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
-#include "tf2_ros/buffer.hpp"
+#include "tf2_ros/buffer.h"
 #include "tf2_sensor_msgs/tf2_sensor_msgs.hpp"
 #include "vision_msgs/msg/label_info.hpp"
+#include "visualization_msgs/msg/marker.hpp"
 
 /**
  * @brief Represents the parameters associated with the cost calculation for a given class
@@ -97,6 +103,154 @@ struct TileWorldXY
     double x, y;
 };
 
+/**
+ * @brief 2D ground-plane FOV checker for points at z=0.
+ * Four corner rays → intersection with plane z=0. If intersection distance is outside [min_d, max_d],
+ * substitutes the point at min_d or max_d along the ray (xy footprint). Always 4 vertices, ordered CCW.
+ */
+class GroundPlaneFOVChecker
+{
+public:
+    GroundPlaneFOVChecker(double hFOV, double vFOV, double min_dist, double max_dist)
+        : hFOV_(hFOV), vFOV_(vFOV), min_d_(min_dist), max_d_(max_dist)
+    {
+        buildLocalRays();
+    }
+
+    void updatePose(const geometry_msgs::msg::Point& pos, const geometry_msgs::msg::Quaternion& quat)
+    {
+        position_ = Eigen::Vector3d(pos.x, pos.y, pos.z);
+        orientation_ = Eigen::Quaterniond(quat.w, quat.x, quat.y, quat.z);
+        orientation_.normalize();
+        recomputeGroundPolygon();
+    }
+
+    bool isInFOV(double wx, double wy) const
+    {
+        if (ground_polygon_.size() < 3) return false;
+        return pointInPolygon(Vec2D{wx, wy}, ground_polygon_);
+    }
+
+    /** @return Ground polygon as points (z=0) for visualization; empty if invalid. */
+    std::vector<geometry_msgs::msg::Point> getGroundPolygonForVisualization() const
+    {
+        std::vector<geometry_msgs::msg::Point> out;
+        out.reserve(ground_polygon_.size());
+        for (const auto& p : ground_polygon_) {
+            geometry_msgs::msg::Point pt;
+            pt.x = p.x;
+            pt.y = p.y;
+            pt.z = 0.0;
+            out.push_back(pt);
+        }
+        return out;
+    }
+
+private:
+    struct Vec2D { double x, y; };
+
+    double hFOV_, vFOV_, min_d_, max_d_;
+    Eigen::Vector3d position_;
+    Eigen::Quaterniond orientation_;
+    std::vector<Eigen::Vector3d> local_rays_;
+    std::vector<Vec2D> ground_polygon_;
+
+    void buildLocalRays()
+    {
+        local_rays_.clear();
+        Eigen::Vector3d Z = Eigen::Vector3d::UnitZ();
+        for (int sv : {1, -1}) {
+            for (int sh : {1, -1}) {
+                Eigen::Affine3d rx(Eigen::AngleAxisd(sv * vFOV_ / 2.0, Eigen::Vector3d::UnitX()));
+                Eigen::Affine3d ry(Eigen::AngleAxisd(sh * hFOV_ / 2.0, Eigen::Vector3d::UnitY()));
+                local_rays_.push_back((rx * ry * Z).normalized());
+            }
+        }
+    }
+
+    /** xy of origin + dist * d (footprint for clamping when intersection is out of range). */
+    static Vec2D rayPointAtDistance(
+        const Eigen::Vector3d& origin, const Eigen::Vector3d& d_unit, double dist)
+    {
+        Eigen::Vector3d p = origin + dist * d_unit;
+        return Vec2D{p.x(), p.y()};
+    }
+
+    /**
+     * if t < min_d use point at min_d along ray; if t > max_d use max_d;
+     */
+    Vec2D rayGroundPointClamped(const Eigen::Vector3d& origin, const Eigen::Vector3d& dir) const
+    {
+        const double eps = 1e-9;
+        Eigen::Vector3d d = dir.normalized();
+
+        // Horizontal / upward: no single z=0 hit in front — cap at max_d for stable quad
+        if (d.z() >= -eps) {
+            return rayPointAtDistance(origin, d, max_d_);
+        }
+
+        const double t = -origin.z() / d.z();  // distance along ray to z=0
+        if (t <= 0.0) {
+            return rayPointAtDistance(origin, d, max_d_);
+        }
+        if (t < min_d_) {
+            return rayPointAtDistance(origin, d, min_d_);
+        }
+        if (t > max_d_) {
+            return rayPointAtDistance(origin, d, max_d_);
+        }
+        return Vec2D{origin.x() + t * d.x(), origin.y() + t * d.y()};
+    }
+
+    /** Order 4 points CCW around centroid so LINE_STRIP closes without self-intersection. */
+    static std::vector<Vec2D> orderQuadCCW(std::vector<Vec2D> pts)
+    {
+        if (pts.size() < 3) return pts;
+        double cx = 0, cy = 0;
+        for (const auto& p : pts) {
+            cx += p.x;
+            cy += p.y;
+        }
+        cx /= static_cast<double>(pts.size());
+        cy /= static_cast<double>(pts.size());
+        std::sort(pts.begin(), pts.end(), [cx, cy](const Vec2D& a, const Vec2D& b) {
+            return std::atan2(a.y - cy, a.x - cx) < std::atan2(b.y - cy, b.x - cx);
+        });
+        return pts;
+    }
+
+    void recomputeGroundPolygon()
+    {
+        if (local_rays_.size() != 4u) {
+            ground_polygon_.clear();
+            return;
+        }
+        std::vector<Vec2D> candidates;
+        candidates.reserve(4);
+        for (const auto& ray : local_rays_) {
+            Eigen::Vector3d world_dir = orientation_ * ray;
+            candidates.push_back(rayGroundPointClamped(position_, world_dir));
+        }
+        ground_polygon_ = orderQuadCCW(std::move(candidates));
+    }
+
+    /**
+     * Point-in-polygon test. Polygon must be CCW (convex hull output).
+     * Cross product (b-a)×(p-a): positive => point to left of edge => INSIDE.
+     * cross == 0 (on edge) treated as inside for robustness.
+     */
+    static bool pointInPolygon(const Vec2D& p, const std::vector<Vec2D>& poly)
+    {
+        const size_t n = poly.size();
+        for (size_t i = 0; i < n; ++i) {
+            const Vec2D& a = poly[i];
+            const Vec2D& b = poly[(i + 1) % n];
+            const double cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
+            if (cross < 0) return false;  // outside (right of edge)
+        }
+        return true;  // inside or on edge
+    }
+};
 /**
  * @brief Encapsulates the observation data for a tile, including class ID, cost, confidence, and timestamp.
  */
@@ -386,6 +540,7 @@ class SegmentationTileMap {
         {
             return tile_map_.size();
         }
+        float getDecayTime() const { return decay_time_; }
 
         /**
          * @brief Converts world coordinates to a TileIndex.
@@ -477,10 +632,12 @@ struct PointData {
  * over that tile
  * @param tileMap The segmentation tile map
  */
-inline sensor_msgs::msg::PointCloud2 visualizeTemporalTileMap(SegmentationTileMap& tileMap) {
+sensor_msgs::msg::PointCloud2 visualizeTemporalTileMap(SegmentationTileMap& tileMap, const std::string& frame_id,
+                                                       const rclcpp::Time& stamp)
+{
     sensor_msgs::msg::PointCloud2 cloud;
-    cloud.header.frame_id = "map";  // Set appropriate frame_id
-    cloud.header.stamp = rclcpp::Clock().now();  // Set current time as timestamp
+    cloud.header.frame_id = frame_id;
+    cloud.header.stamp = stamp;
 
     // Define fields for PointCloud2
     sensor_msgs::PointCloud2Modifier modifier(cloud);
@@ -674,11 +831,13 @@ class SegmentationBuffer
                        std::vector<std::string> class_types,
                        std::unordered_map<std::string, CostHeuristicParams> class_names_cost_map,
                        std::unordered_map<std::string, std::vector<std::string>> class_type_to_names,
-                       double observation_keep_time,
-                       double expected_update_rate, double max_lookahead_distance, double min_lookahead_distance,
-                       tf2_ros::Buffer& tf2_buffer, std::string global_frame, std::string sensor_frame,
-                       tf2::Duration tf_tolerance, double costmap_resolution, double tile_map_decay_time, bool visualize_tile_map = false,
-                       bool use_cost_selection = true);
+                       double observation_keep_time, double expected_update_rate, double max_lookahead_distance,
+                       double min_lookahead_distance, tf2_ros::Buffer& tf2_buffer, std::string global_frame,
+                       std::string sensor_frame, tf2::Duration tf_tolerance, double costmap_resolution,
+                       double tile_map_decay_time, bool visualize_tile_map = false, bool use_cost_selection = true,
+                       double camera_h_fov = 1.52, double camera_v_fov = 1.01, double camera_min_dist = 0.0,
+                       double camera_max_dist = 8.0, double fov_inside_decay_time = 5.0,
+                       double fov_outside_decay_time = 5.0, bool visualize_frustum_fov = false);
 
     /**
      * @brief  Destructor... cleans up
@@ -794,9 +953,23 @@ class SegmentationBuffer
 
     bool visualize_tile_map_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr tile_map_pub_;
+    bool visualize_frustum_fov_;
+    rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr frustum_fov_pub_;
     // If true, select observation per tile using highest max_cost. If false, use highest confidence
     bool use_cost_selection_ = true;
+
+    // 2D ground FOV only (GroundPlaneFOVChecker); no 3D frustum
+    double camera_h_fov_;
+    double camera_v_fov_;
+    double camera_min_dist_;
+    double camera_max_dist_;
+    double fov_inside_decay_time_;
+    double fov_outside_decay_time_;
+    GroundPlaneFOVChecker ground_fov_checker_;
+    // For throttled FOV logging (every 100 observations) and frustum coords
+    double last_frustum_origin_x_ = 0.0;
+    double last_frustum_origin_y_ = 0.0;
+    double last_frustum_origin_z_ = 0.0;
 };
 }  // namespace semantic_segmentation_layer
 #endif  // SEMANTIC_SEGMENTATION_LAYER__SEGMENTATION_BUFFER_HPP_
-

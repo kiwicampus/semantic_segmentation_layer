@@ -42,10 +42,13 @@
 #include <list>
 #include <string>
 #include <vector>
+#include <cmath>
 
 #include "sensor_msgs/point_cloud2_iterator.hpp"
-#include "tf2/convert.hpp"
+#include "tf2/convert.h"
 #include "rclcpp/rclcpp.hpp"
+#include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
+#include "visualization_msgs/msg/marker.hpp"
 using namespace std::chrono_literals;
 
 namespace semantic_segmentation_layer {
@@ -56,8 +59,9 @@ SegmentationBuffer::SegmentationBuffer(const nav2_util::LifecycleNode::WeakPtr& 
                                        double expected_update_rate, double max_lookahead_distance,
                                        double min_lookahead_distance, tf2_ros::Buffer& tf2_buffer,
                                        std::string global_frame, std::string sensor_frame,
-                                       tf2::Duration tf_tolerance, double costmap_resolution, double tile_map_decay_time, bool visualize_tile_map,
-                                       bool use_cost_selection)
+                                       tf2::Duration tf_tolerance, double costmap_resolution, double tile_map_decay_time, bool visualize_tile_map, bool use_cost_selection,
+                                       double camera_h_fov, double camera_v_fov, double camera_min_dist, double camera_max_dist,
+                                       double fov_inside_decay_time, double fov_outside_decay_time, bool visualize_frustum_fov)
   : tf2_buffer_(tf2_buffer)
   , class_types_(class_types)
   , class_names_cost_map_(class_names_cost_map)
@@ -70,6 +74,13 @@ SegmentationBuffer::SegmentationBuffer(const nav2_util::LifecycleNode::WeakPtr& 
   , sq_max_lookahead_distance_(std::pow(max_lookahead_distance, 2))
   , sq_min_lookahead_distance_(std::pow(min_lookahead_distance, 2))
   , tf_tolerance_(tf_tolerance)
+  , camera_h_fov_(camera_h_fov)
+    , camera_v_fov_(camera_v_fov)
+    , camera_min_dist_(camera_min_dist)
+    , camera_max_dist_(camera_max_dist)
+    , fov_inside_decay_time_(fov_inside_decay_time)
+    , fov_outside_decay_time_(fov_outside_decay_time)
+    , ground_fov_checker_(camera_h_fov, camera_v_fov, camera_min_dist, camera_max_dist)  // On init: 2D FOV checker
 {
   auto node = parent.lock();
   clock_ = node->get_clock();
@@ -81,7 +92,12 @@ SegmentationBuffer::SegmentationBuffer(const nav2_util::LifecycleNode::WeakPtr& 
   RCLCPP_INFO(logger_, "SegmentationBuffer [%s]: Selection method = %s", 
               buffer_source_.c_str(), 
               use_cost_selection_ ? "COST-BASED (max_cost)" : "CONFIDENCE-BASED");
-  if(visualize_tile_map_)
+  visualize_frustum_fov_ = visualize_frustum_fov;
+    if (visualize_frustum_fov_)
+    {
+        frustum_fov_pub_ = node->create_publisher<visualization_msgs::msg::Marker>(buffer_source + "/frustum_fov", 1);
+    }
+              if(visualize_tile_map_)
   {
     tile_map_pub_ = node->create_publisher<sensor_msgs::msg::PointCloud2>(buffer_source + "/tile_map",1);
   }
@@ -127,6 +143,50 @@ void SegmentationBuffer::bufferSegmentation(
     local_origin.point.y = 0;
     local_origin.point.z = 0;
     tf2_buffer_.transform(local_origin, global_origin, global_frame_, tf_tolerance_);
+    // Each costmap update cycle, after getting TF: update 2D FOV checker pose in global frame
+    geometry_msgs::msg::TransformStamped cam_tf =
+        tf2_buffer_.lookupTransform(global_frame_, origin_frame, cloud.header.stamp, tf_tolerance_);
+    geometry_msgs::msg::Point frustum_origin;
+    frustum_origin.x = global_origin.point.x;
+    frustum_origin.y = global_origin.point.y;
+    frustum_origin.z = global_origin.point.z;
+
+    ground_fov_checker_.updatePose(frustum_origin, cam_tf.transform.rotation);
+    last_frustum_origin_x_ = frustum_origin.x;
+    last_frustum_origin_y_ = frustum_origin.y;
+    last_frustum_origin_z_ = frustum_origin.z;
+
+    std::vector<geometry_msgs::msg::Point> polygon = ground_fov_checker_.getGroundPolygonForVisualization();
+
+    if (visualize_frustum_fov_ && frustum_fov_pub_)
+    {
+        visualization_msgs::msg::Marker marker;
+        marker.header.frame_id = global_frame_;
+        marker.header.stamp = cloud.header.stamp;
+        marker.ns = buffer_source_ + "_frustum";
+        marker.id = 0;
+        marker.type = visualization_msgs::msg::Marker::LINE_STRIP;
+        marker.action = visualization_msgs::msg::Marker::ADD;
+        marker.scale.x = 0.05;
+        marker.color.r = 0.0f;
+        marker.color.g = 1.0f;
+        marker.color.b = 0.0f;
+        marker.color.a = 1.0f;
+        if (polygon.size() >= 3)
+        {
+            for (const auto& p : polygon)
+                marker.points.push_back(p);
+            marker.points.push_back(polygon.front());  // close the polygon
+        }
+        else if (polygon.size() == 2)
+        {
+            // Only 2 rays hit z=0 (other 2 "above horizon"); draw the segment so something is visible
+            marker.points.push_back(polygon[0]);
+            marker.points.push_back(polygon[1]);
+        }
+        // else: 0 or 1 point -> leave points empty (frustum not visible on ground)
+        frustum_fov_pub_->publish(marker);
+    }
 
     sensor_msgs::msg::PointCloud2 global_frame_cloud;
 
@@ -201,6 +261,25 @@ void SegmentationBuffer::bufferSegmentation(
 
     // emplace the best observations in the mask into the tile map
     temporal_tile_map_->lock();
+     if (fov_outside_decay_time_ > 0.0)
+        {
+            const double inside_decay =
+                (fov_inside_decay_time_ > 0.0) ? fov_inside_decay_time_ : temporal_tile_map_->getDecayTime();
+            const double outside_decay = fov_outside_decay_time_;
+            int tiles_inside = 0, tiles_outside = 0;
+            
+            // For each (mx, my) tile in the map, test if its world position is inside the 2D FOV
+            for (auto& tile : *temporal_tile_map_)
+            {
+                TileWorldXY world = temporal_tile_map_->indexToWorld(tile.first.x, tile.first.y);
+                const bool inside = ground_fov_checker_.isInFOV(world.x, world.y);
+                tile.second.setDecayTime(inside ? inside_decay : outside_decay);
+                inside ? ++tiles_inside : ++tiles_outside;
+            }
+            RCLCPP_DEBUG(logger_,
+                         "SegmentationBuffer [%s] FOV decay applied: %d tiles inside (%.2fs), %d tiles outside (%.2fs)",
+                         buffer_source_.c_str(), tiles_inside, inside_decay, tiles_outside, outside_decay);
+        }
     temporal_tile_map_->purgeOldObservations(cloud_time_seconds);
     for (auto& idx : best_observations_idxs)
     {
@@ -222,7 +301,7 @@ void SegmentationBuffer::bufferSegmentation(
 
     if(visualize_tile_map_)
     {
-      sensor_msgs::msg::PointCloud2 tile_map_cloud = visualizeTemporalTileMap(*temporal_tile_map_);
+      sensor_msgs::msg::PointCloud2 tile_map_cloud = visualizeTemporalTileMap(*temporal_tile_map_, global_frame_, clock_->now());
       tile_map_pub_->publish(tile_map_cloud);
     }
 
