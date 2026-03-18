@@ -39,9 +39,9 @@
 #ifndef SEMANTIC_SEGMENTATION_LAYER__SEGMENTATION_BUFFER_HPP_
 #define SEMANTIC_SEGMENTATION_LAYER__SEGMENTATION_BUFFER_HPP_
 
-#include <list>
 #include <algorithm>
 #include <cmath>
+#include <list>
 #include <optional>
 #include <string>
 #include <vector>
@@ -71,29 +71,29 @@ struct CostHeuristicParams
 /**
  * @brief Represents a 2D grid index with equality comparison. Supports negative indexes
  */
-struct TileIndex {
+struct TileIndex
+{
     int x, y;
 
-    bool operator==(const TileIndex& other) const {
-        return x == other.x && y == other.y;
-    }
+    bool operator==(const TileIndex& other) const { return x == other.x && y == other.y; }
 };
 
 namespace std {
-    /**
-     * @brief Custom hash function for TileIndex to enable its use as a key in unordered_map.
-     */
-    template<>
-    struct hash<TileIndex> {
-        size_t operator()(const TileIndex& coord) const {
-            // Compute individual hash values for two integers
-            // and combine them using bitwise XOR
-            // and bit shifting:
-            return std::hash<int>()(coord.x) ^ (std::hash<int>()(coord.y) << 1);
-        }
-    };
-}
-
+/**
+ * @brief Custom hash function for TileIndex to enable its use as a key in unordered_map.
+ */
+template <>
+struct hash<TileIndex>
+{
+    size_t operator()(const TileIndex& coord) const
+    {
+        // Compute individual hash values for two integers
+        // and combine them using bitwise XOR
+        // and bit shifting:
+        return std::hash<int>()(coord.x) ^ (std::hash<int>()(coord.y) << 1);
+    }
+};
+}  // namespace std
 
 /**
  * @brief Represents the world coordinates of a tile.
@@ -110,7 +110,7 @@ struct TileWorldXY
  */
 class GroundPlaneFOVChecker
 {
-public:
+   public:
     GroundPlaneFOVChecker(double hFOV, double vFOV, double min_dist, double max_dist)
         : hFOV_(hFOV), vFOV_(vFOV), min_d_(min_dist), max_d_(max_dist)
     {
@@ -136,7 +136,8 @@ public:
     {
         std::vector<geometry_msgs::msg::Point> out;
         out.reserve(ground_polygon_.size());
-        for (const auto& p : ground_polygon_) {
+        for (const auto& p : ground_polygon_)
+        {
             geometry_msgs::msg::Point pt;
             pt.x = p.x;
             pt.y = p.y;
@@ -146,8 +147,11 @@ public:
         return out;
     }
 
-private:
-    struct Vec2D { double x, y; };
+   private:
+    struct Vec2D
+    {
+        double x, y;
+    };
 
     double hFOV_, vFOV_, min_d_, max_d_;
     Eigen::Vector3d position_;
@@ -159,8 +163,10 @@ private:
     {
         local_rays_.clear();
         Eigen::Vector3d Z = Eigen::Vector3d::UnitZ();
-        for (int sv : {1, -1}) {
-            for (int sh : {1, -1}) {
+        for (int sv : {1, -1})
+        {
+            for (int sh : {1, -1})
+            {
                 Eigen::Affine3d rx(Eigen::AngleAxisd(sv * vFOV_ / 2.0, Eigen::Vector3d::UnitX()));
                 Eigen::Affine3d ry(Eigen::AngleAxisd(sh * hFOV_ / 2.0, Eigen::Vector3d::UnitY()));
                 local_rays_.push_back((rx * ry * Z).normalized());
@@ -169,8 +175,7 @@ private:
     }
 
     /** xy of origin + dist * d (footprint for clamping when intersection is out of range). */
-    static Vec2D rayPointAtDistance(
-        const Eigen::Vector3d& origin, const Eigen::Vector3d& d_unit, double dist)
+    static Vec2D rayPointAtDistance(const Eigen::Vector3d& origin, const Eigen::Vector3d& d_unit, double dist)
     {
         Eigen::Vector3d p = origin + dist * d_unit;
         return Vec2D{p.x(), p.y()};
@@ -185,18 +190,22 @@ private:
         Eigen::Vector3d d = dir.normalized();
 
         // Horizontal / upward: no single z=0 hit in front — cap at max_d for stable quad
-        if (d.z() >= -eps) {
+        if (d.z() >= -eps)
+        {
             return rayPointAtDistance(origin, d, max_d_);
         }
 
         const double t = -origin.z() / d.z();  // distance along ray to z=0
-        if (t <= 0.0) {
+        if (t <= 0.0)
+        {
             return rayPointAtDistance(origin, d, max_d_);
         }
-        if (t < min_d_) {
+        if (t < min_d_)
+        {
             return rayPointAtDistance(origin, d, min_d_);
         }
-        if (t > max_d_) {
+        if (t > max_d_)
+        {
             return rayPointAtDistance(origin, d, max_d_);
         }
         return Vec2D{origin.x() + t * d.x(), origin.y() + t * d.y()};
@@ -207,7 +216,8 @@ private:
     {
         if (pts.size() < 3) return pts;
         double cx = 0, cy = 0;
-        for (const auto& p : pts) {
+        for (const auto& p : pts)
+        {
             cx += p.x;
             cy += p.y;
         }
@@ -221,13 +231,15 @@ private:
 
     void recomputeGroundPolygon()
     {
-        if (local_rays_.size() != 4u) {
+        if (local_rays_.size() != 4u)
+        {
             ground_polygon_.clear();
             return;
         }
         std::vector<Vec2D> candidates;
         candidates.reserve(4);
-        for (const auto& ray : local_rays_) {
+        for (const auto& ray : local_rays_)
+        {
             Eigen::Vector3d world_dir = orientation_ * ray;
             candidates.push_back(rayGroundPointClamped(position_, world_dir));
         }
@@ -242,7 +254,8 @@ private:
     static bool pointInPolygon(const Vec2D& p, const std::vector<Vec2D>& poly)
     {
         const size_t n = poly.size();
-        for (size_t i = 0; i < n; ++i) {
+        for (size_t i = 0; i < n; ++i)
+        {
             const Vec2D& a = poly[i];
             const Vec2D& b = poly[(i + 1) % n];
             const double cross = (b.x - a.x) * (p.y - a.y) - (b.y - a.y) * (p.x - a.x);
@@ -254,7 +267,8 @@ private:
 /**
  * @brief Encapsulates the observation data for a tile, including class ID, cost, confidence, and timestamp.
  */
-struct TileObservation {
+struct TileObservation
+{
     using UniquePtr = std::unique_ptr<TileObservation>;
 
     uint8_t class_id;
@@ -287,25 +301,28 @@ class TemporalObservationQueue
     void push(TileObservation tile_obs, bool dominant_priority = false)
     {
         uint8_t class_id = tile_obs.class_id;
-        
+
         // Add observation to the appropriate class queue
         auto& queue = class_queues_[class_id];
         queue.push_back(tile_obs);
-        
+
         // Update confidence sum for this class
         class_confidence_sums_[class_id] += tile_obs.confidence;
-        
+
         // Check if this class should become dominant
         size_t current_class_size = queue.size();
         bool should_become_dominant = false;
-        
-        if (dominant_priority) {
+
+        if (dominant_priority)
+        {
             should_become_dominant = true;
-        } else {
-            //logic for non-dominant_priority classes: only compete by size
+        }
+        else
+        {
+            // logic for non-dominant_priority classes: only compete by size
             should_become_dominant = (current_class_size > dominant_class_size_);
         }
-        
+
         if (should_become_dominant)
         {
             // New dominant class - purge all other classes
@@ -313,7 +330,7 @@ class TemporalObservationQueue
             {
                 clearQueuesExcept(class_id);
             }
-            
+
             // Update dominance
             setDominant(class_id, current_class_size);
         }
@@ -341,8 +358,8 @@ class TemporalObservationQueue
      * @brief Gets the current sum of confidence values of the dominant class.
      * @return The sum of confidences for the dominant class.
      */
-    float getConfidenceSum() const 
-    { 
+    float getConfidenceSum() const
+    {
         if (dominant_class_id_ != -1)
         {
             auto it = class_confidence_sums_.find(dominant_class_id_);
@@ -363,8 +380,8 @@ class TemporalObservationQueue
      * the object in the class is not made editable by others
      * @return The dominant class queue, or empty deque if no dominant class.
      */
-    std::deque<TileObservation> getQueue() 
-    { 
+    std::deque<TileObservation> getQueue()
+    {
         if (dominant_class_id_ != -1)
         {
             auto it = class_queues_.find(dominant_class_id_);
@@ -385,11 +402,11 @@ class TemporalObservationQueue
         // in class_queues_, its queue size is >= 1.
         bool dominant_removed = false;
 
-        for (auto it = class_queues_.begin(); it != class_queues_.end(); )
+        for (auto it = class_queues_.begin(); it != class_queues_.end();)
         {
             auto& queue = it->second;
             const uint8_t class_id = it->first;
-        
+
             // Pop observations older than decay_time_ from the front (oldest first),
             // updating the confidence sum accordingly.
             while (!queue.empty())
@@ -405,7 +422,7 @@ class TemporalObservationQueue
                     break;
                 }
             }
-        
+
             // If the queue ended up empty, erase the class entry entirely to avoid
             // keeping "zombie" keys and to keep class_queues_ and class_confidence_sums_
             // in sync. Track if the dominant class was removed to recompute dominance later.
@@ -420,21 +437,26 @@ class TemporalObservationQueue
                 ++it;
             }
         }
-        
+
         // Update dominant class bookkeeping:
         // - If the dominant class was removed, scan to find the new dominant.
         // - Otherwise, just refresh the dominant_class_size_ if it still exists;
         //   if not found (edge case), reset dominance.
-        if (dominant_removed) {
+        if (dominant_removed)
+        {
             recomputeDominant();
-        } else if (dominant_class_id_ != -1) {
+        }
+        else if (dominant_class_id_ != -1)
+        {
             auto it = class_queues_.find(dominant_class_id_);
-            if (it != class_queues_.end()) setDominant(dominant_class_id_, it->second.size());
-            else resetDominant();
+            if (it != class_queues_.end())
+                setDominant(dominant_class_id_, it->second.size());
+            else
+                resetDominant();
         }
     }
 
-private:
+   private:
     /**
      * @brief Removes all class queues and confidence sums except the specified class.
      * @param keep_class_id The class ID to preserve.
@@ -493,124 +515,124 @@ private:
  * @brief Manages a map of tile observations, allowing for spatial and temporal querying.
  * Utilizes an unordered_map to efficiently index observations by tile and supports locking for thread safety.
  */
-class SegmentationTileMap {
-    private:
-        std::unordered_map<TileIndex, TemporalObservationQueue> tile_map_;
-        float resolution_;
-        float decay_time_;
-        std::recursive_mutex lock_;
+class SegmentationTileMap
+{
+   private:
+    std::unordered_map<TileIndex, TemporalObservationQueue> tile_map_;
+    float resolution_;
+    float decay_time_;
+    std::recursive_mutex lock_;
 
+   public:
+    using SharedPtr = std::shared_ptr<SegmentationTileMap>;
 
-    public:
-        using SharedPtr = std::shared_ptr<SegmentationTileMap>;
+    // Define iterator types
+    using Iterator = typename std::unordered_map<TileIndex, TemporalObservationQueue>::iterator;
+    using ConstIterator = typename std::unordered_map<TileIndex, TemporalObservationQueue>::const_iterator;
 
-        // Define iterator types
-        using Iterator = typename std::unordered_map<TileIndex, TemporalObservationQueue>::iterator;
-        using ConstIterator = typename std::unordered_map<TileIndex, TemporalObservationQueue>::const_iterator;
+    SegmentationTileMap(float resolution, float decay_time) : resolution_(resolution), decay_time_(decay_time)
+    {
+        // 10k observations seemed to be a good estimate of the amount of data to be held for a decay time of ~5s
+        tile_map_.reserve(1e4);
+    }
+    SegmentationTileMap() {}
 
-        SegmentationTileMap(float resolution, float decay_time) : resolution_(resolution), decay_time_(decay_time) {
-            // 10k observations seemed to be a good estimate of the amount of data to be held for a decay time of ~5s
-            tile_map_.reserve(1e4);
-        }
-        SegmentationTileMap(){}
+    // Return iterator to the beginning of the tile_map_
+    Iterator begin() { return tile_map_.begin(); }
+    ConstIterator begin() const { return tile_map_.begin(); }
 
-        // Return iterator to the beginning of the tile_map_
-        Iterator begin() { return tile_map_.begin(); }
-        ConstIterator begin() const { return tile_map_.begin(); }
+    // Return iterator to the end of the tile_map_
+    Iterator end() { return tile_map_.end(); }
+    ConstIterator end() const { return tile_map_.end(); }
 
-        // Return iterator to the end of the tile_map_
-        Iterator end() { return tile_map_.end(); }
-        ConstIterator end() const { return tile_map_.end(); }
+    /**
+     * @brief Locks the map for exclusive access.
+     */
+    inline void lock() { lock_.lock(); }
 
-        /**
-         * @brief Locks the map for exclusive access.
-         */
-        inline void lock() { lock_.lock(); }
+    /**
+     * @brief Unlocks the map.
+     */
+    inline void unlock() { lock_.unlock(); }
 
-        /**
-         * @brief Unlocks the map.
-         */
-        inline void unlock() { lock_.unlock(); }
+    /**
+     * @brief Returns the number of elements in the map.
+     * @return The size of the map.
+     */
+    int size() { return tile_map_.size(); }
+    float getDecayTime() const { return decay_time_; }
 
-        /**
-         * @brief Returns the number of elements in the map.
-         * @return The size of the map.
-         */
-        int size()
+    /**
+     * @brief Converts world coordinates to a TileIndex.
+     * @param x X coordinate in world space.
+     * @param y Y coordinate in world space.
+     * @return The corresponding TileIndex.
+     */
+    TileIndex worldToIndex(double x, double y) const
+    {
+        // Convert world coordinates to grid indices
+        int ix = static_cast<int>(std::floor(x / resolution_));
+        int iy = static_cast<int>(std::floor(y / resolution_));
+        return TileIndex{ix, iy};
+    }
+
+    /**
+     * @brief Converts a TileIndex to world coordinates.
+     * @param idx The index to convert.
+     * @return The world coordinates of the tile's center.
+     */
+    TileWorldXY indexToWorld(int x, int y) const
+    {
+        // Calculate the world coordinates of the center of the grid cell
+        double x_world = (static_cast<double>(x) + 0.5) * resolution_;
+        double y_world = (static_cast<double>(y) + 0.5) * resolution_;
+        return TileWorldXY{x_world, y_world};
+    }
+
+    /**
+     * @brief Adds an observation to the specified tile.
+     * @param obs The observation to add.
+     * @param idx The index of the tile.
+     * @param dominant_priority Whether this class should take immediate dominance when observed.
+     */
+    void pushObservation(TileObservation& obs, TileIndex& idx, bool dominant_priority = false)
+    {
+        auto it = tile_map_.find(idx);
+        if (it != tile_map_.end())
         {
-            return tile_map_.size();
+            // TileIndex exists, push the observation with dominance flag
+            it->second.push(obs, dominant_priority);
         }
-        float getDecayTime() const { return decay_time_; }
-
-        /**
-         * @brief Converts world coordinates to a TileIndex.
-         * @param x X coordinate in world space.
-         * @param y Y coordinate in world space.
-         * @return The corresponding TileIndex.
-         */
-        TileIndex worldToIndex(double x, double y) const {
-            // Convert world coordinates to grid indices
-            int ix = static_cast<int>(std::floor(x / resolution_));
-            int iy = static_cast<int>(std::floor(y / resolution_));
-            return TileIndex{ix, iy};
-        }
-
-        /**
-         * @brief Converts a TileIndex to world coordinates.
-         * @param idx The index to convert.
-         * @return The world coordinates of the tile's center.
-         */
-        TileWorldXY indexToWorld(int x, int y) const {
-            // Calculate the world coordinates of the center of the grid cell
-            double x_world = (static_cast<double>(x) + 0.5) * resolution_;
-            double y_world = (static_cast<double>(y) + 0.5) * resolution_;
-            return TileWorldXY{x_world, y_world};
-        }
-
-        /**
-         * @brief Adds an observation to the specified tile.
-         * @param obs The observation to add.
-         * @param idx The index of the tile.
-         * @param dominant_priority Whether this class should take immediate dominance when observed.
-         */
-        void pushObservation(TileObservation& obs, TileIndex& idx, bool dominant_priority = false)
+        else
         {
-            auto it = tile_map_.find(idx);
-            if (it != tile_map_.end())
+            // TileIndex does not exist, create a new TemporalObservationQueue with decay time
+            TemporalObservationQueue& queue = tile_map_[idx];
+            queue.setDecayTime(decay_time_);
+            queue.push(obs, dominant_priority);
+        }
+    }
+
+    /**
+     * @brief Removes observations older than the decay time from all tiles.
+     * @param current_time The current time for comparison.
+     */
+    void purgeOldObservations(double current_time)
+    {
+        std::vector<TileIndex> tiles_to_remove;
+        for (auto& tile : tile_map_)
+        {
+            tile.second.purgeOld(current_time);
+            if (tile.second.empty())
             {
-                // TileIndex exists, push the observation with dominance flag
-                it->second.push(obs, dominant_priority);
-            }
-            else
-            {
-                // TileIndex does not exist, create a new TemporalObservationQueue with decay time
-                TemporalObservationQueue& queue = tile_map_[idx];
-                queue.setDecayTime(decay_time_);
-                queue.push(obs, dominant_priority);
+                tiles_to_remove.emplace_back(tile.first);
             }
         }
-
-        /**
-         * @brief Removes observations older than the decay time from all tiles.
-         * @param current_time The current time for comparison.
-         */
-        void purgeOldObservations(double current_time)
-        {
-            std::vector<TileIndex> tiles_to_remove;
-            for (auto& tile : tile_map_)
-            {
-                tile.second.purgeOld(current_time);
-                if(tile.second.empty())
-                {
-                    tiles_to_remove.emplace_back(tile.first);
-                }
-            }
-            if(tile_map_.size() > 0)
+        if (tile_map_.size() > 0)
             for (auto& tile : tiles_to_remove)
             {
                 tile_map_.erase(tile);
             }
-        }
+    }
 };
 
 /**
@@ -618,14 +640,15 @@ class SegmentationTileMap {
  * its position, its confidence, the confidence sum of the tile and the
  * class to which it belongs
  */
-struct PointData {
+struct PointData
+{
     float x, y, z;
     float confidence, confidence_sum;
     uint8_t class_id;
 };
 
 /**
- * @brief Creates a PointCloud2 message that contains a visual representation of 
+ * @brief Creates a PointCloud2 message that contains a visual representation of
  * a temporal tile map. There's a "column" of points on each tile, each point represents
  * a segmentation observation over that tile and they are all stacked together. Each observation
  * Has a channel for the class, for the confidence, and the confidence sum of the observations
@@ -641,20 +664,20 @@ sensor_msgs::msg::PointCloud2 visualizeTemporalTileMap(SegmentationTileMap& tile
 
     // Define fields for PointCloud2
     sensor_msgs::PointCloud2Modifier modifier(cloud);
-    modifier.setPointCloud2Fields(6, "x", 1, sensor_msgs::msg::PointField::FLOAT32,
-                                     "y", 1, sensor_msgs::msg::PointField::FLOAT32,
-                                     "z", 1, sensor_msgs::msg::PointField::FLOAT32,
-                                     "confidence", 1, sensor_msgs::msg::PointField::FLOAT32,
-                                     "confidence_sum", 1, sensor_msgs::msg::PointField::FLOAT32,
-                                     "class", 1, sensor_msgs::msg::PointField::UINT8);
+    modifier.setPointCloud2Fields(
+        6, "x", 1, sensor_msgs::msg::PointField::FLOAT32, "y", 1, sensor_msgs::msg::PointField::FLOAT32, "z", 1,
+        sensor_msgs::msg::PointField::FLOAT32, "confidence", 1, sensor_msgs::msg::PointField::FLOAT32, "confidence_sum",
+        1, sensor_msgs::msg::PointField::FLOAT32, "class", 1, sensor_msgs::msg::PointField::UINT8);
 
     // Reserve space for points
     std::vector<PointData> points;
-    for (auto& tile : tileMap) {
+    for (auto& tile : tileMap)
+    {
         TileIndex idx = tile.first;
         TileWorldXY worldXY = tileMap.indexToWorld(idx.x, idx.y);
         double z = 0.0;
-        for (auto& obs : tile.second.getQueue()) {
+        for (auto& obs : tile.second.getQueue())
+        {
             PointData point;
             point.x = worldXY.x;
             point.y = worldXY.y;
@@ -676,14 +699,20 @@ sensor_msgs::msg::PointCloud2 visualizeTemporalTileMap(SegmentationTileMap& tile
     sensor_msgs::PointCloud2Iterator<float> iter_confidence_sum(cloud, "confidence_sum");
     sensor_msgs::PointCloud2Iterator<uint8_t> iter_class(cloud, "class");
 
-    for (const auto& point : points) {
+    for (const auto& point : points)
+    {
         *iter_x = point.x;
         *iter_y = point.y;
         *iter_z = point.z;
         *iter_confidence = point.confidence;
         *iter_confidence_sum = point.confidence_sum;
         *iter_class = point.class_id;
-        ++iter_x; ++iter_y; ++iter_z; ++iter_confidence;++iter_confidence_sum; ++iter_class;
+        ++iter_x;
+        ++iter_y;
+        ++iter_z;
+        ++iter_confidence;
+        ++iter_confidence_sum;
+        ++iter_class;
     }
 
     return cloud;
@@ -693,25 +722,29 @@ sensor_msgs::msg::PointCloud2 visualizeTemporalTileMap(SegmentationTileMap& tile
  * Manages segmentation class information, including mapping between class names and IDs,
  * as well as managing the cost heuristic parameters associated with each class.
  */
-class SegmentationCostMultimap {
-public:
+class SegmentationCostMultimap
+{
+   public:
     using SharedPtr = std::shared_ptr<SegmentationCostMultimap>;
-    SegmentationCostMultimap(){}
+    SegmentationCostMultimap() {}
     /**
      * Constructs the SegmentationCostMultimap.
-     * 
+     *
      * @param nameToIdMap A map from class names to class IDs.
      * @param nameToCostMap A map from class names to CostHeuristicParams.
      */
     SegmentationCostMultimap(const std::unordered_map<std::string, uint8_t>& nameToIdMap,
-                             const std::unordered_map<std::string, CostHeuristicParams>& nameToCostMap) {
+                             const std::unordered_map<std::string, CostHeuristicParams>& nameToCostMap)
+    {
         std::lock_guard<std::mutex> lock(mutex_);
         name_to_id_ = nameToIdMap;
-        for (const auto& pair : nameToIdMap) {
+        for (const auto& pair : nameToIdMap)
+        {
             const auto& name = pair.first;
             uint8_t id = pair.second;
             auto cost_it = nameToCostMap.find(name);
-            if (cost_it == nameToCostMap.end()) {
+            if (cost_it == nameToCostMap.end())
+            {
                 // This shouldn't happen because we already checked in createSegmentationCostMultimap
                 // but let's be extra safe
                 id_to_cost_[id] = CostHeuristicParams{0, 0, 0, 0, false};
@@ -723,25 +756,28 @@ public:
 
     /**
      * Updates the cost heuristic parameters associated with a class ID.
-     * 
+     *
      * @param id The class ID.
      * @param cost The new CostHeuristicParams to associate with the class.
      */
-    void updateCostById(uint8_t id, const CostHeuristicParams& cost) {
+    void updateCostById(uint8_t id, const CostHeuristicParams& cost)
+    {
         std::lock_guard<std::mutex> lock(mutex_);
         id_to_cost_[id] = cost;
     }
 
     /**
      * Retrieves the cost heuristic parameters associated with a class ID.
-     * 
+     *
      * @param id The class ID.
      * @return The CostHeuristicParams associated with the class.
      */
-    CostHeuristicParams getCostById(uint8_t id) const {
+    CostHeuristicParams getCostById(uint8_t id) const
+    {
         std::lock_guard<std::mutex> lock(mutex_);
         auto it = id_to_cost_.find(id);
-        if (it == id_to_cost_.end()) {
+        if (it == id_to_cost_.end())
+        {
             return CostHeuristicParams{0, 0, 0, 0, false};
         }
         return it->second;
@@ -749,22 +785,24 @@ public:
 
     /**
      * Checks if a class ID exists in the cost mapping.
-     * 
+     *
      * @param id The class ID to check.
      * @return true if the class ID exists, false otherwise.
      */
-    bool hasClassId(uint8_t id) const {
+    bool hasClassId(uint8_t id) const
+    {
         // No lock needed - only reading, no concurrent modifications
         return id_to_cost_.find(id) != id_to_cost_.end();
     }
 
     /**
      * Updates the cost heuristic parameters associated with a class name.
-     * 
+     *
      * @param name The class name.
      * @param cost The new CostHeuristicParams to associate with the class.
      */
-    void updateCostByName(const std::string& name, const CostHeuristicParams& cost) {
+    void updateCostByName(const std::string& name, const CostHeuristicParams& cost)
+    {
         std::lock_guard<std::mutex> lock(mutex_);
         uint8_t id = name_to_id_.at(name);
         id_to_cost_[id] = cost;
@@ -772,22 +810,24 @@ public:
 
     /**
      * Retrieves the cost heuristic parameters associated with a class name.
-     * 
+     *
      * @param name The class name.
      * @return The CostHeuristicParams associated with the class.
      */
-    CostHeuristicParams getCostByName(const std::string& name) const {
+    CostHeuristicParams getCostByName(const std::string& name) const
+    {
         std::lock_guard<std::mutex> lock(mutex_);
         uint8_t id = name_to_id_.at(name);
         return id_to_cost_.at(id);
     }
 
-    bool empty() {
+    bool empty()
+    {
         std::lock_guard<std::mutex> lock(mutex_);
         return name_to_id_.empty() || id_to_cost_.empty();
     }
 
-private:
+   private:
     mutable std::mutex mutex_;  // mutable allows locking in const methods
     std::unordered_map<std::string, uint8_t> name_to_id_;
     std::unordered_map<uint8_t, CostHeuristicParams> id_to_cost_;
@@ -895,7 +935,7 @@ class SegmentationBuffer
      */
     std::string getBufferSource() { return buffer_source_; }
     std::vector<std::string> getClassTypes() { return class_types_; }
-    
+
     /**
      * @brief Get class names for a specific class type
      * @param class_type The class type to get names for
@@ -909,10 +949,7 @@ class SegmentationBuffer
 
     void updateClassMap(std::string new_class, CostHeuristicParams new_cost);
 
-    SegmentationTileMap::SharedPtr getSegmentationTileMap()
-    {
-        return temporal_tile_map_;
-    }
+    SegmentationTileMap::SharedPtr getSegmentationTileMap() { return temporal_tile_map_; }
 
     CostHeuristicParams getCostForClassId(uint8_t class_id)
     {
@@ -946,7 +983,7 @@ class SegmentationBuffer
     double sq_max_lookahead_distance_;
     double sq_min_lookahead_distance_;
     tf2::Duration tf_tolerance_;
-    
+
     SegmentationCostMultimap::SharedPtr segmentation_cost_multimap_;
 
     SegmentationTileMap::SharedPtr temporal_tile_map_;
