@@ -9,7 +9,7 @@
   </description>
   <maintainer email="pepisg@robot.com">Pedro Gonzalez</maintainer>
   <maintainer email="sunart24@robot.com">Johan Solarte</maintainer>
-  <license>MIT</license>
+  <license>Apache-2.0</license>
 
   <buildtool_depend>ament_cmake</buildtool_depend>
   <build_depend>nav2_common</build_depend>
