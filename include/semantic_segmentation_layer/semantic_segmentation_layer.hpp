@@ -52,7 +52,7 @@
 #include "nav2_costmap_2d/layer.hpp"
 #include "nav2_costmap_2d/layered_costmap.hpp"
 #include "semantic_segmentation_layer/segmentation_buffer.hpp"
-#include "nav2_ros_common/node_utils.hpp"
+#include "nav2_util/node_utils.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "tf2_ros/message_filter.hpp"
 #include "vision_msgs/msg/label_info.hpp"
@@ -136,6 +136,20 @@ class SemanticSegmentationLayer : public nav2_costmap_2d::CostmapLayer
 
     rcl_interfaces::msg::SetParametersResult dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters);
 
+   protected:
+    /**
+     * @brief Mark cells along rays from the buffer's latest sensor origin to
+     * each captured (finite, in-range) cloud point as FREE_SPACE in this
+     * layer's costmap_. Mirrors nav2_costmap_2d::ObstacleLayer::raytraceFreespace.
+     * Caller MUST hold buffer->lock() (already true in updateBounds).
+     *
+     * @param buffer the SegmentationBuffer to pull the latest clearing observation from
+     * @param min_x,min_y,max_x,max_y bounds rectangle to grow as cells are touched
+     */
+    void raytraceFreespace(
+        const std::shared_ptr<semantic_segmentation_layer::SegmentationBuffer>& buffer,
+        double* min_x, double* min_y, double* max_x, double* max_y);
+
    private:
     void syncSegmPointcloudCb(const std::shared_ptr<const sensor_msgs::msg::Image>& segmentation,
                               const std::shared_ptr<const sensor_msgs::msg::PointCloud2>& pointcloud,
@@ -149,13 +163,13 @@ class SemanticSegmentationLayer : public nav2_costmap_2d::CostmapLayer
     void labelinfoCb(const std::shared_ptr<const vision_msgs::msg::LabelInfo>& label_info,
                      const std::shared_ptr<semantic_segmentation_layer::SegmentationBuffer>& buffer);
 
-    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image>>>
+    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image, rclcpp_lifecycle::LifecycleNode>>>
         semantic_segmentation_subs_;
-    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image>>>
+    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::Image, rclcpp_lifecycle::LifecycleNode>>>
         semantic_segmentation_confidence_subs_;
-    std::vector<std::shared_ptr<message_filters::Subscriber<vision_msgs::msg::LabelInfo>>>
+    std::vector<std::shared_ptr<message_filters::Subscriber<vision_msgs::msg::LabelInfo, rclcpp_lifecycle::LifecycleNode>>>
         label_info_subs_;
-    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::PointCloud2>>>
+    std::vector<std::shared_ptr<message_filters::Subscriber<sensor_msgs::msg::PointCloud2, rclcpp_lifecycle::LifecycleNode>>>
         pointcloud_subs_;
     using ExactSync2 = message_filters::TimeSynchronizer<sensor_msgs::msg::Image, sensor_msgs::msg::PointCloud2>;
     using ExactSync3 = message_filters::TimeSynchronizer<sensor_msgs::msg::Image, sensor_msgs::msg::Image, sensor_msgs::msg::PointCloud2>;

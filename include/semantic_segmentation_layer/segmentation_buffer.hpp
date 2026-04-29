@@ -42,8 +42,10 @@
 #include <list>
 #include <string>
 #include <vector>
+#include <deque>
 
-#include "nav2_ros_common/lifecycle_node.hpp"
+
+#include "nav2_util/lifecycle_node.hpp"
 #include "rclcpp/time.hpp"
 #include "sensor_msgs/msg/image.hpp"
 #include "sensor_msgs/msg/point_cloud2.hpp"
@@ -645,6 +647,23 @@ class SegmentationBuffer
 {
    public:
     using SharedPtr = std::shared_ptr<SegmentationBuffer>;
+
+    /**
+     * @brief Latest "clearing" observation captured by bufferSegmentation,
+     * used by SemanticSegmentationLayer::raytraceFreespace to walk rays
+     * from the sensor origin to each observed (finite, in-range) cloud
+     * point and mark cells along the way as FREE_SPACE.
+     *
+     * Mirrors nav2_costmap_2d::Observation but stores points already
+     * transformed into global_frame_ — so the layer can call
+     * Costmap2D::raytraceLine directly without per-point TF lookups.
+     */
+    struct ClearingObservation {
+        rclcpp::Time time;
+        geometry_msgs::msg::Point origin;            // sensor origin in global_frame
+        std::vector<geometry_msgs::msg::Point> points;  // hits in global_frame
+    };
+
     /**
      * @brief  Constructs an segmentation buffer
      * @param  topic_name The topic of the segmentations, used as an identifier for error and warning
@@ -670,7 +689,7 @@ class SegmentationBuffer
      * @param  tf_tolerance The amount of time to wait for a transform to be available when setting a
      * new global frame
      */
-    SegmentationBuffer(const nav2::LifecycleNode::WeakPtr& parent, std::string buffer_source,
+    SegmentationBuffer(const nav2_util::LifecycleNode::WeakPtr& parent, std::string buffer_source,
                        std::vector<std::string> class_types,
                        std::unordered_map<std::string, CostHeuristicParams> class_names_cost_map,
                        std::unordered_map<std::string, std::vector<std::string>> class_type_to_names,
@@ -748,6 +767,39 @@ class SegmentationBuffer
 
     void setMaxObstacleDistance(double distance) { sq_max_lookahead_distance_ = pow(distance, 2); }
 
+    /**
+     * @brief Set the maximum range (m) to which raytrace clearing trusts the sensor.
+     * Points beyond this distance from the sensor origin are not used to clear cells.
+     */
+    void setRaytraceMaxRange(double range) { sq_raytrace_max_range_ = range * range; }
+
+    /**
+     * @brief Set the minimum range (m) below which raytrace clearing ignores returns.
+     * Points closer than this to the sensor origin are not used to clear cells.
+     */
+    void setRaytraceMinRange(double range) { sq_raytrace_min_range_ = range * range; }
+
+    /**
+     * @brief Enable/disable the per-frame capture of clearing observations.
+     * When false, getClearingObservation() always returns false and bufferSegmentation
+     * skips the per-pixel point capture (zero overhead vs. baseline plugin).
+     */
+    void setClearingEnabled(bool enabled) { clearing_enabled_ = enabled; }
+
+    /**
+     * @brief Copy out the most recent clearing observation captured by bufferSegmentation.
+     * @param obs output observation; populated only when this method returns true
+     * @return true if a fresh clearing observation is available, false otherwise.
+     */
+    bool getClearingObservation(ClearingObservation& obs);
+
+    /**
+     * @brief Read-only accessor for the squared raytrace ranges so the layer
+     * can compute per-cycle Bresenham bounds without re-reading params.
+     */
+    double getSqRaytraceMaxRange() const { return sq_raytrace_max_range_; }
+    double getSqRaytraceMinRange() const { return sq_raytrace_min_range_; }
+
     void updateClassMap(std::string new_class, CostHeuristicParams new_cost);
 
     SegmentationTileMap::SharedPtr getSegmentationTileMap()
@@ -796,6 +848,18 @@ class SegmentationBuffer
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr tile_map_pub_;
     // If true, select observation per tile using highest max_cost. If false, use highest confidence
     bool use_cost_selection_ = true;
+
+    // ------- Raytrace-clearing state (PR3) -------
+    // sq_raytrace_*_range_ default to (8m)^2 / 0.0; layer overrides via setters from
+    // per-source params raytrace_max_range / raytrace_min_range.
+    double sq_raytrace_max_range_ = 64.0;
+    double sq_raytrace_min_range_ = 0.0;
+    // When clearing_enabled_ is false the bufferSegmentation point-capture path is
+    // skipped entirely — no overhead vs the pre-PR3 plugin behavior.
+    bool clearing_enabled_ = false;
+    // Latest captured observation; readable via getClearingObservation() under lock_.
+    ClearingObservation latest_clearing_obs_;
+    bool has_clearing_obs_ = false;
 };
 }  // namespace semantic_segmentation_layer
 #endif  // SEMANTIC_SEGMENTATION_LAYER__SEGMENTATION_BUFFER_HPP_

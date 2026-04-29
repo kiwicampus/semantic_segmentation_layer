@@ -49,7 +49,7 @@
 using namespace std::chrono_literals;
 
 namespace semantic_segmentation_layer {
-SegmentationBuffer::SegmentationBuffer(const nav2::LifecycleNode::WeakPtr& parent,
+SegmentationBuffer::SegmentationBuffer(const nav2_util::LifecycleNode::WeakPtr& parent,
                                        std::string buffer_source, std::vector<std::string> class_types, std::unordered_map<std::string, CostHeuristicParams> class_names_cost_map,
                                        std::unordered_map<std::string, std::vector<std::string>> class_type_to_names,
                                        double observation_keep_time,
@@ -140,6 +140,16 @@ void SegmentationBuffer::bufferSegmentation(
     std::unordered_map<TileIndex, int> best_observations_idxs;
     double cloud_time_seconds = rclcpp::Time(cloud.header.stamp.sec, cloud.header.stamp.nanosec).seconds();
 
+    // PR3: also accumulate every finite, in-range point (in global_frame_) so the
+    // layer's raytraceFreespace pass can clear cells along rays from the sensor
+    // origin to each observed point. Cheap when clearing_enabled_ is false: the
+    // vector stays empty and the per-pixel push_back below is skipped.
+    std::vector<geometry_msgs::msg::Point> clearing_points;
+    if (clearing_enabled_)
+    {
+      clearing_points.reserve(static_cast<size_t>(segmentation.height) * segmentation.width);
+    }
+
     // copy over the points that are within our segmentation range
     for (size_t v = 0; v < segmentation.height; v++)
     {
@@ -164,6 +174,20 @@ void SegmentationBuffer::bufferSegmentation(
           ++iter_y_global;
           ++iter_z_global;
           continue;
+        }
+
+        // PR3: capture this point for the layer's raytrace-clearing pass.
+        // We use the same finite + lookahead-range filter the marking path uses,
+        // so any point that becomes a marking candidate also becomes a clearing
+        // ray endpoint. The layer's own raytrace_max_range additionally bounds
+        // how far along each ray FREE_SPACE is written.
+        if (clearing_enabled_)
+        {
+          geometry_msgs::msg::Point p;
+          p.x = *iter_x_global;
+          p.y = *iter_y_global;
+          p.z = *iter_z_global;
+          clearing_points.push_back(p);
         }
 
         TileIndex costmap_index = temporal_tile_map_->worldToIndex(*iter_x_global, *iter_y_global);
@@ -197,6 +221,19 @@ void SegmentationBuffer::bufferSegmentation(
         ++iter_y_global;
         ++iter_z_global;
       }
+    }
+
+    // PR3: stash the captured global-frame points + sensor origin under our
+    // own lock_ so the layer's updateBounds (which holds buffer->lock()) can
+    // copy them out via getClearingObservation(). Recursive mutex tolerates
+    // re-entry from layer paths that already hold lock_.
+    if (clearing_enabled_)
+    {
+      std::lock_guard<std::recursive_mutex> guard(lock_);
+      latest_clearing_obs_.time = rclcpp::Time(cloud.header.stamp.sec, cloud.header.stamp.nanosec);
+      latest_clearing_obs_.origin = global_origin.point;
+      latest_clearing_obs_.points = std::move(clearing_points);
+      has_clearing_obs_ = true;
     }
 
     // emplace the best observations in the mask into the tile map
@@ -280,4 +317,19 @@ bool SegmentationBuffer::isCurrent() const
 }
 
 void SegmentationBuffer::resetLastUpdated() { last_updated_ = clock_->now(); }
+
+// PR3: copy out the last captured clearing observation under lock_. Returns
+// false (and leaves obs untouched) if clearing is disabled or no frame has
+// been received yet. The caller (SemanticSegmentationLayer::updateBounds)
+// already holds lock_; recursive mutex makes the re-acquire safe.
+bool SegmentationBuffer::getClearingObservation(ClearingObservation& obs)
+{
+  std::lock_guard<std::recursive_mutex> guard(lock_);
+  if (!clearing_enabled_ || !has_clearing_obs_)
+  {
+    return false;
+  }
+  obs = latest_clearing_obs_;
+  return true;
+}
 }  // namespace semantic_segmentation_layer
