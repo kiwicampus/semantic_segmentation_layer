@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.8)
+cmake_minimum_required(VERSION 3.20)
 project(semantic_segmentation_layer)
 
 # Default to C++17
@@ -33,6 +33,8 @@ include_directories(include)
 add_library(semantic_segmentation_layer SHARED
   src/semantic_segmentation_layer.cpp
   src/segmentation_buffer.cpp
+  src/segmentation_tile_map.cpp
+  src/temporal_observation_queue.cpp
 )
 
 target_include_directories(semantic_segmentation_layer
