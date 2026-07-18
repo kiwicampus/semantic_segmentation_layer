@@ -35,9 +35,8 @@
  * Authors: Pedro Gonzalez (pedro@robot.com)
  *          Johan Solarte (jsolarte@robot.com)
  *********************************************************************/
-#include "semantic_segmentation_layer/segmentation_buffer.hpp"
 
-#include <algorithm>
+ #include <algorithm>
 #include <chrono>
 #include <cmath>
 #include <list>
@@ -49,6 +48,10 @@
 #include "rclcpp/rclcpp.hpp"
 #include "tf2_geometry_msgs/tf2_geometry_msgs.hpp"
 #include "visualization_msgs/msg/marker.hpp"
+
+#include "semantic_segmentation_layer/segmentation_buffer.hpp"
+#include "semantic_segmentation_layer/utils.hpp"
+
 using namespace std::chrono_literals;
 
 namespace semantic_segmentation_layer {
