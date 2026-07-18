@@ -66,7 +66,7 @@ namespace semantic_segmentation_layer {
  */
 class SemanticSegmentationLayer : public nav2_costmap_2d::CostmapLayer
 {
-   public:
+public:
     /**
      * @brief A constructor
      */
@@ -81,6 +81,7 @@ class SemanticSegmentationLayer : public nav2_costmap_2d::CostmapLayer
      * @brief Initialization process of layer on startup
      */
     virtual void onInitialize();
+
     /**
      * @brief Update the bounds of the master costmap by this layer's update dimensions. 
      * This method includes temporal consistency by purging old observations
@@ -138,7 +139,7 @@ class SemanticSegmentationLayer : public nav2_costmap_2d::CostmapLayer
 
     rcl_interfaces::msg::SetParametersResult dynamicParametersCallback(std::vector<rclcpp::Parameter> parameters);
 
-   private:
+private:
     void syncSegmPointcloudCb(const std::shared_ptr<const sensor_msgs::msg::Image>& segmentation,
                               const std::shared_ptr<const sensor_msgs::msg::PointCloud2>& pointcloud,
                               const std::shared_ptr<semantic_segmentation_layer::SegmentationBuffer>& buffer);
