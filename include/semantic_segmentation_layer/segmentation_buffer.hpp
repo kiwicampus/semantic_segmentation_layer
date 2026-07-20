@@ -63,14 +63,15 @@
 #include "segmentation_cost_multimap.hpp"
 #include "segmentation_tile_map.hpp"
 
-namespace semantic_segmentation_layer {
+namespace semantic_segmentation_layer
+{
 /**
  * @class SegmentationBuffer
  * @brief Takes in point clouds from sensors, transforms them to the desired frame, and stores them
  */
 class SegmentationBuffer
 {
-   public:
+public:
     using SharedPtr = std::shared_ptr<SegmentationBuffer>;
     /**
      * @brief  Constructs an segmentation buffer
@@ -229,7 +230,7 @@ class SegmentationBuffer
         return segmentation_cost_multimap_->getCostByName(class_name);
     }
 
-   private:
+private:
     /**
      * @brief  Removes any stale segmentations from the buffer list
      */
