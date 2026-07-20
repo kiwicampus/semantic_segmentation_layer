@@ -135,8 +135,19 @@ class SegmentationBuffer
      */
     std::unordered_map<std::string, CostHeuristicParams> getClassMap();
 
+    /**
+     * @brief Store the metadata of classes from label info published by the inference node
+     *
+     * @param label_info
+     */
     void createSegmentationCostMultimap(const vision_msgs::msg::LabelInfo& label_info);
 
+    /**
+     * @brief Check if there's no class metadata stored
+     *
+     * @return true
+     * @return false
+     */
     bool isClassIdCostMapEmpty() { return segmentation_cost_multimap_->empty(); }
 
     /**
@@ -164,8 +175,14 @@ class SegmentationBuffer
      * @brief Reset last updated timestamp
      */
     std::string getBufferSource() { return buffer_source_; }
+
+    /**
+     * @brief Obtain class names strings
+     *
+     * @return std::vector<std::string>
+     */
     std::vector<std::string> getClassTypes() { return class_types_; }
-    
+
     /**
      * @brief Get class names for a specific class type
      * @param class_type The class type to get names for
@@ -177,6 +194,12 @@ class SegmentationBuffer
 
     void setMaxObstacleDistance(double distance) { sq_max_lookahead_distance_ = pow(distance, 2); }
 
+    /**
+     * @brief Store new class metadata when new class types are published
+     *
+     * @param new_class
+     * @param new_cost
+     */
     void updateClassMap(std::string new_class, CostHeuristicParams new_cost);
 
     SegmentationTileMap::SharedPtr getSegmentationTileMap()
@@ -184,11 +207,23 @@ class SegmentationBuffer
         return temporal_tile_map_;
     }
 
+    /**
+     * @brief Obtain class metadata, especially the associated cost values for a given class ID
+     *
+     * @param class_id
+     * @return CostHeuristicParams
+     */
     CostHeuristicParams getCostForClassId(uint8_t class_id)
     {
         return segmentation_cost_multimap_->getCostById(class_id);
     }
 
+    /**
+     * @brief Obtain class metadata, especially the associated cost values for a given class name
+     *
+     * @param class_name
+     * @return CostHeuristicParams
+     */
     CostHeuristicParams getCostForClassName(std::string class_name)
     {
         return segmentation_cost_multimap_->getCostByName(class_name);
