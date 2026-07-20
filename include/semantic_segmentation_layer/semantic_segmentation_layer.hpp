@@ -59,7 +59,8 @@
 #include "tf2_ros/message_filter.hpp"
 #include "vision_msgs/msg/label_info.hpp"
 
-namespace semantic_segmentation_layer {
+namespace semantic_segmentation_layer
+{
 /**
  * @class SemanticSegmentationLayer
  * @brief Takes in semantic segmentation messages and aligned pointclouds to populate the 2D costmap
@@ -83,7 +84,7 @@ public:
     virtual void onInitialize();
 
     /**
-     * @brief Update the bounds of the master costmap by this layer's update dimensions. 
+     * @brief Update the bounds of the master costmap by this layer's update dimensions.
      * This method includes temporal consistency by purging old observations
      * before calculating costs, ensuring the costmap reflects the current state
      * after decay time has been applied.
@@ -163,10 +164,10 @@ private:
 #endif
 
     std::vector<std::shared_ptr<SubFilter<sensor_msgs::msg::Image>>> semantic_segmentation_subs_;
-    std::vector<std::shared_ptr<SubFilter<sensor_msgs::msg::Image>>>
-        semantic_segmentation_confidence_subs_;
+    std::vector<std::shared_ptr<SubFilter<sensor_msgs::msg::Image>>> semantic_segmentation_confidence_subs_;
     std::vector<std::shared_ptr<SubFilter<vision_msgs::msg::LabelInfo>>> label_info_subs_;
     std::vector<std::shared_ptr<SubFilter<sensor_msgs::msg::PointCloud2>>> pointcloud_subs_;
+
     using ExactSync2 = message_filters::TimeSynchronizer<sensor_msgs::msg::Image, sensor_msgs::msg::PointCloud2>;
     using ExactSync3 = message_filters::TimeSynchronizer<sensor_msgs::msg::Image, sensor_msgs::msg::Image, sensor_msgs::msg::PointCloud2>;
     using ApproxSyncPolicy2 = message_filters::sync_policies::ApproximateTime<sensor_msgs::msg::Image, sensor_msgs::msg::PointCloud2>;
