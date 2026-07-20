@@ -46,7 +46,7 @@
 /**
  * @brief Encapsulates the observation data for a tile, including class ID, cost, confidence, and timestamp.
  */
-struct TileObservation 
+struct TileObservation
 {
     using UniquePtr = std::unique_ptr<TileObservation>;
 
