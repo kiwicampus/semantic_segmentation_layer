@@ -114,8 +114,8 @@ void SegmentationBuffer::createSegmentationCostMultimap(const vision_msgs::msg::
   {
     const auto& name = semantic_class.class_name;
     if (class_names_cost_map_.find(name) == class_names_cost_map_.end()) {
-      RCLCPP_INFO(logger_, 
-        "CRITICAL ERROR: Class '%s' from label_info is not defined in the costmap parameters! This class will be ignored.", 
+      RCLCPP_INFO(logger_,
+        "CRITICAL ERROR: Class '%s' from label_info is not defined in the costmap parameters! This class will be ignored.",
         name.c_str());
       continue;
     }
@@ -237,14 +237,14 @@ void SegmentationBuffer::bufferSegmentation(
             auto existing_cost = segmentation_cost_multimap_->getCostById(existing_class);
             if (current_cost.max_cost > existing_cost.max_cost) {
               best_observations_idxs[costmap_index] = pixel_idx;
-              RCLCPP_DEBUG(logger_, "COST-BASED: Replaced tile observation - current_class=%d (max_cost=%d) > existing_class=%d (max_cost=%d)", 
+              RCLCPP_DEBUG(logger_, "COST-BASED: Replaced tile observation - current_class=%d (max_cost=%d) > existing_class=%d (max_cost=%d)",
                           current_class, current_cost.max_cost, existing_class, existing_cost.max_cost);
             }
           } else {
             // Confidence-based: pick highest confidence
             if (confidence.data[pixel_idx] > confidence.data[it->second]) {
               best_observations_idxs[costmap_index] = pixel_idx;
-              RCLCPP_DEBUG(logger_, "CONFIDENCE-BASED: Replaced tile observation - current_confidence=%d > existing_confidence=%d", 
+              RCLCPP_DEBUG(logger_, "CONFIDENCE-BASED: Replaced tile observation - current_confidence=%d > existing_confidence=%d",
                           confidence.data[pixel_idx], confidence.data[it->second]);
             }
           }
@@ -284,14 +284,14 @@ void SegmentationBuffer::bufferSegmentation(
       int img_idx_for_best_obs = idx.second;
       TileIndex costmap_index = idx.first;
       uint8_t class_id = segmentation.data[img_idx_for_best_obs];
-      
+
       // Only process observations with defined class IDs
       if (segmentation_cost_multimap_->hasClassId(class_id)) {
         TileObservation best_obs{class_id, static_cast<float>(confidence.data[img_idx_for_best_obs]), cloud_time_seconds};
         bool dominant_priority = segmentation_cost_multimap_->getCostById(class_id).dominant_priority;
         temporal_tile_map_->pushObservation(best_obs, costmap_index, dominant_priority);
       } else {
-        RCLCPP_DEBUG(logger_, "SegmentationBuffer [%s]: Skipping undefined class_id %d in tile (%d, %d)", 
+        RCLCPP_DEBUG(logger_, "SegmentationBuffer [%s]: Skipping undefined class_id %d in tile (%d, %d)",
                       buffer_source_.c_str(), class_id, costmap_index.x, costmap_index.y);
       }
     }
