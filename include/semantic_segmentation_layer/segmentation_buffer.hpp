@@ -238,35 +238,41 @@ class SegmentationBuffer
     rclcpp::Clock::SharedPtr clock_;
     rclcpp::Logger logger_{rclcpp::get_logger("nav2_costmap_2d")};
     tf2_ros::Buffer& tf2_buffer_;
-    std::vector<std::string> class_types_;
-    std::unordered_map<std::string, CostHeuristicParams> class_names_cost_map_;
-    std::unordered_map<std::string, std::vector<std::string>> class_type_to_names_;
-    const rclcpp::Duration observation_keep_time_;
-    const rclcpp::Duration expected_update_rate_;
-    rclcpp::Time last_updated_;
-    std::string global_frame_;
-    std::string sensor_frame_;
-    std::string buffer_source_;
-    std::recursive_mutex lock_;  ///< @brief A lock for accessing data in callbacks safely
-    double sq_max_lookahead_distance_;
-    double sq_min_lookahead_distance_;
-    tf2::Duration tf_tolerance_;
-    
-    SegmentationCostMultimap::SharedPtr segmentation_cost_multimap_;
-
-    SegmentationTileMap::SharedPtr temporal_tile_map_;
 
     bool visualize_tile_map_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr tile_map_pub_;
     bool visualize_frustum_fov_;
     rclcpp::Publisher<visualization_msgs::msg::Marker>::SharedPtr frustum_fov_pub_;
+
+    std::recursive_mutex lock_;  ///< @brief A lock for accessing data in callbacks safely
+
+    std::string global_frame_;
+    std::string sensor_frame_;
+    std::string buffer_source_;
+    tf2::Duration tf_tolerance_;
+
+    std::vector<std::string> class_types_;
+    std::unordered_map<std::string, CostHeuristicParams> class_names_cost_map_;
+    std::unordered_map<std::string, std::vector<std::string>> class_type_to_names_;
+
+    const rclcpp::Duration observation_keep_time_;
+    const rclcpp::Duration expected_update_rate_;
+    rclcpp::Time last_updated_;
+
+    double sq_max_lookahead_distance_;
+    double sq_min_lookahead_distance_;
+
     // If true, select observation per tile using highest max_cost. If false, use highest confidence
     bool use_cost_selection_ = true;
+
+    SegmentationCostMultimap::SharedPtr segmentation_cost_multimap_;
+    SegmentationTileMap::SharedPtr temporal_tile_map_;
 
     double camera_h_fov_;
     double camera_v_fov_;
     double fov_inside_decay_time_;
     double fov_outside_decay_time_;
+
     GroundPlaneFOVChecker ground_fov_checker_;
 };
 }  // namespace semantic_segmentation_layer
